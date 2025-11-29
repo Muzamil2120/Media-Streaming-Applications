@@ -1,0 +1,5 @@
+{
+  "verbose": false,
+  "watch": ["./server", "./config"],
+  "exec": "node ./server/server.js"
+}
