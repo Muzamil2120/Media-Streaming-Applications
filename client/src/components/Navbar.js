@@ -1,23 +1,14 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import './Navbar.css';
 
 function Navbar() {
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [user, setUser] = React.useState(null);
-
-  // Check if user is logged in (mock authentication)
-  React.useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      setUser(JSON.parse(userData));
-    }
-  }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    setUser(null);
+    logout();
     navigate('/');
   };
 
