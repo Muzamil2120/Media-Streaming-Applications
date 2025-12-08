@@ -42,5 +42,13 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Muzamil2120/Media-Streaming-Applications.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Muzamil2120/Media-Streaming-Applications/issues"
+  },
+  "homepage": "https://github.com/Muzamil2120/Media-Streaming-Applications#readme"
 }
