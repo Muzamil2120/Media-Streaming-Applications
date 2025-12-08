@@ -1,22 +1,34 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { mediaAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import './MediaForm.css';
 
 function NewMedia() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    category: '',
-    tags: ''
+    category: 'general',
+    tags: '',
+    isPublic: true
   });
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
+  React.useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/signin');
+    }
+  }, [isAuthenticated, navigate]);
+
   const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: type === 'checkbox' ? checked : value
     });
   };
 
@@ -26,16 +38,29 @@ function NewMedia() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    
+    if (!file) {
+      setError('Please select a video file');
+      return;
+    }
+
     setUploading(true);
 
     try {
-      // Mock upload - replace with actual API call
-      setTimeout(() => {
-        alert('Video uploaded successfully!');
-        navigate('/media');
-      }, 2000);
+      const uploadFormData = new FormData();
+      uploadFormData.append('video', file);
+      uploadFormData.append('title', formData.title);
+      uploadFormData.append('description', formData.description);
+      uploadFormData.append('category', formData.category);
+      uploadFormData.append('tags', formData.tags);
+      uploadFormData.append('isPublic', formData.isPublic);
+
+      await mediaAPI.upload(uploadFormData);
+      navigate('/media');
     } catch (error) {
-      alert('Upload failed. Please try again.');
+      setError(error.message || 'Upload failed. Please try again.');
+    } finally {
       setUploading(false);
     }
   };
@@ -48,6 +73,8 @@ function NewMedia() {
       </div>
 
       <form onSubmit={handleSubmit} className="media-form">
+        {error && <div className="error-message">{error}</div>}
+
         <div className="form-group">
           <label>Video File *</label>
           <div className="file-upload">
@@ -58,9 +85,10 @@ function NewMedia() {
               required
             />
             <div className="file-info">
-              {file ? file.name : 'Choose video file (MP4, AVI, MOV, WMV)'}
+              {file ? `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)` : 'Choose video file (MP4, AVI, MOV, WMV, MKV, WEBM)'}
             </div>
           </div>
+          <small>Max file size: 100MB</small>
         </div>
 
         <div className="form-group">
@@ -93,12 +121,13 @@ function NewMedia() {
             value={formData.category}
             onChange={handleChange}
           >
-            <option value="">Select category</option>
+            <option value="general">General</option>
             <option value="education">Education</option>
             <option value="entertainment">Entertainment</option>
             <option value="technology">Technology</option>
             <option value="music">Music</option>
             <option value="sports">Sports</option>
+            <option value="gaming">Gaming</option>
           </select>
         </div>
 
@@ -109,8 +138,20 @@ function NewMedia() {
             name="tags"
             value={formData.tags}
             onChange={handleChange}
-            placeholder="Enter tags separated by commas"
+            placeholder="Enter tags separated by commas (e.g., tutorial, react, webdev)"
           />
+        </div>
+
+        <div className="form-group checkbox-group">
+          <label>
+            <input
+              type="checkbox"
+              name="isPublic"
+              checked={formData.isPublic}
+              onChange={handleChange}
+            />
+            Make this video public
+          </label>
         </div>
 
         <div className="form-actions">
@@ -118,6 +159,7 @@ function NewMedia() {
             type="button" 
             className="cancel-btn"
             onClick={() => navigate('/media')}
+            disabled={uploading}
           >
             Cancel
           </button>

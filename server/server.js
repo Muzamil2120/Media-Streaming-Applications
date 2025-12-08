@@ -1,164 +1,110 @@
+// server/server.js - ULTRA SIMPLE VERSION
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
 const path = require('path');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-require('dotenv').config();
+const fs = require('fs');
 
 const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Create uploads directory
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 // Middleware
-app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(uploadsDir));
 
-// Mock user data (replace with MongoDB models)
-let users = [];
-let media = [];
-
-// Auth Routes
-app.post('/api/auth/signup', async (req, res) => {
+// Connect to MongoDB
+const connectDB = async () => {
   try {
-    const { name, email, password } = req.body;
-
-    // Check if user exists
-    const existingUser = users.find(user => user.email === email);
-    if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' });
+    console.log('🔗 Connecting to MongoDB...');
+    
+    // Check if .env is loaded
+    console.log('Checking environment...');
+    console.log('PORT:', process.env.PORT);
+    console.log('MONGODB_URI exists:', process.env.MONGODB_URI ? '✅ Yes' : '❌ No');
+    
+    if (!process.env.MONGODB_URI) {
+      console.error('❌ ERROR: MONGODB_URI is not defined in .env file');
+      console.log('💡 Please create a .env file with:');
+      console.log('MONGODB_URI=mongodb+srv://mailkmuzami13889_db_user:YOUR_PASSWORD@cluster0.sawpij.mongodb.net/mediastream?retryWrites=true&w=majority&appName=cluster0');
+      console.log('PORT=5000');
+      process.exit(1);
     }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Create user
-    const user = {
-      id: users.length + 1,
-      name,
-      email,
-      password: hashedPassword
-    };
-
-    users.push(user);
-
-    // Generate token
-    const token = jwt.sign(
-      { email: user.email, id: user.id },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '1h' }
-    );
-
-    res.status(201).json({
-      token,
-      user: { id: user.id, name: user.name, email: user.email }
+    
+    // Show masked URI (for security)
+    const maskedURI = process.env.MONGODB_URI.replace(/\/\/(.*?)@/, '//***:***@');
+    console.log('🔗 Connection string:', maskedURI);
+    
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 10000, // 10 second timeout
+      socketTimeoutMS: 45000,
     });
-
+    
+    console.log('✅ MongoDB Atlas Connected Successfully!');
+    
   } catch (error) {
-    res.status(500).json({ message: 'Something went wrong' });
+    console.error('❌ MongoDB Connection Failed:', error.message);
+    console.log('\n🔧 Troubleshooting steps:');
+    console.log('1. Check your password in .env file');
+    console.log('2. Make sure MongoDB Atlas cluster is running');
+    console.log('3. Check internet connection');
+    console.log('4. Go to MongoDB Atlas → Network Access → Add IP Address');
+    console.log('5. Click "Allow Access from Anywhere" (for testing)');
+    process.exit(1);
   }
-});
+};
 
-app.post('/api/auth/signin', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Find user
-    const existingUser = users.find(user => user.email === email);
-    if (!existingUser) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Check password
-    const isPasswordCorrect = await bcrypt.compare(password, existingUser.password);
-    if (!isPasswordCorrect) {
-      return res.status(400).json({ message: 'Invalid credentials' });
-    }
-
-    // Generate token
-    const token = jwt.sign(
-      { email: existingUser.email, id: existingUser.id },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '1h' }
-    );
-
-    res.json({
-      token,
-      user: { 
-        id: existingUser.id, 
-        name: existingUser.name, 
-        email: existingUser.email 
-      }
-    });
-
-  } catch (error) {
-    res.status(500).json({ message: 'Something went wrong' });
-  }
-});
-
-// Media Routes
-app.get('/api/media', (req, res) => {
-  res.json(media);
-});
-
-app.post('/api/media', (req, res) => {
-  const newMedia = {
-    id: media.length + 1,
-    ...req.body,
-    uploadDate: new Date().toISOString(),
-    views: 0
-  };
-  media.push(newMedia);
-  res.status(201).json(newMedia);
-});
-
-app.put('/api/media/:id', (req, res) => {
-  const mediaIndex = media.findIndex(m => m.id === parseInt(req.params.id));
-  if (mediaIndex === -1) {
-    return res.status(404).json({ message: 'Media not found' });
-  }
-  media[mediaIndex] = { ...media[mediaIndex], ...req.body };
-  res.json(media[mediaIndex]);
-});
-
-app.delete('/api/media/:id', (req, res) => {
-  const mediaIndex = media.findIndex(m => m.id === parseInt(req.params.id));
-  if (mediaIndex === -1) {
-    return res.status(404).json({ message: 'Media not found' });
-  }
-  media.splice(mediaIndex, 1);
-  res.json({ message: 'Media deleted successfully' });
-});
-
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'healthy',
-    service: 'MERN Mediastream API',
-    timestamp: new Date().toISOString(),
-    users: users.length,
-    media: media.length
+// Then modify the startServer function:
+const startServer = async () => {
+  await connectDB();  // Wait for DB connection
+  
+  app.listen(PORT, () => {
+    console.log('\n' + '='.repeat(40));
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🌐 http://localhost:${PORT}`);
+    console.log(`📊 Health: http://localhost:${PORT}/health`);
+    console.log('='.repeat(40) + '\n');
   });
-});
+};
+// Import routes
+const mediaRoutes = require('./routes/mediaRoutes');
+const authRoutes = require('./routes/authRoutes');
 
+// Use routes
+app.use('/api/media', mediaRoutes);
+app.use('/api/auth', authRoutes);
+
+// Basic routes
 app.get('/', (req, res) => {
   res.json({ 
-    message: 'MERN Mediastream Backend API',
+    message: 'MediaStream API',
     version: '1.0.0',
     endpoints: {
-      auth: ['/api/auth/signup', '/api/auth/signin'],
       media: '/api/media',
-      health: '/api/health'
+      auth: '/api/auth',
+      uploads: '/uploads'
     }
   });
 });
 
-// Start Server
-const PORT = process.env.PORT || 5001;
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok',
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
+});
 
+// Start server
 app.listen(PORT, () => {
-  console.log('🎬 MERN Mediastream Server Started!');
-  console.log(`📡 API Running: http://localhost:${PORT}`);
-  console.log(`🔐 Auth Endpoints: http://localhost:${PORT}/api/auth`);
-  console.log(`🎥 Media Endpoint: http://localhost:${PORT}/api/media`);
-  console.log(`⏰ Started: ${new Date().toLocaleString()}`);
+  console.log('\n' + '='.repeat(40));
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌐 http://localhost:${PORT}`);
+  console.log('='.repeat(40) + '\n');
 });

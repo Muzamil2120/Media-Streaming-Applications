@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import './Auth.css';
 
 function Signup() {
@@ -10,6 +11,8 @@ function Signup() {
     confirmPassword: ''
   });
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { signup } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -22,44 +25,25 @@ function Signup() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
+      setLoading(false);
       return;
     }
 
     try {
-      // Mock API call - replace with actual backend
-      const response = await fetch('http://localhost:5001/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        navigate('/');
-      } else {
-        setError('Registration failed. Please try again.');
-      }
-    } catch (error) {
-      // Mock success for demo
-      const mockUser = {
-        id: 1,
+      await signup({
         name: formData.name,
-        email: formData.email
-      };
-      localStorage.setItem('token', 'mock-jwt-token');
-      localStorage.setItem('user', JSON.stringify(mockUser));
+        email: formData.email,
+        password: formData.password
+      });
       navigate('/');
+    } catch (error) {
+      setError(error.message || 'Registration failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -100,6 +84,7 @@ function Signup() {
               value={formData.password}
               onChange={handleChange}
               required
+              minLength="6"
             />
           </div>
 
@@ -114,7 +99,9 @@ function Signup() {
             />
           </div>
 
-          <button type="submit" className="auth-btn">Sign Up</button>
+          <button type="submit" className="auth-btn" disabled={loading}>
+            {loading ? 'Creating Account...' : 'Sign Up'}
+          </button>
         </form>
 
         <p className="auth-link">
