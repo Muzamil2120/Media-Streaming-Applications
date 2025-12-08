@@ -1,115 +1,27 @@
+// server/routes/authRoutes.js
 const express = require('express');
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const auth = require('../middleware/auth');
 const router = express.Router();
 
-// Sign up
-router.post('/signup', async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
-
-    // Check if user exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
-
-    // Create user
-    const user = new User({ name, email, password });
-    await user.save();
-
-    // Generate token
-    const token = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.status(201).json({
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        avatar: user.avatar
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
+// Simple auth routes for now
+router.post('/register', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Register endpoint - implement later',
+    token: 'dummy-token-for-development'
+  });
 });
 
-// Sign in
-router.post('/signin', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Find user
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+router.post('/login', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Login endpoint - implement later',
+    token: 'dummy-token-for-development',
+    user: {
+      id: 'user-id',
+      username: 'testuser',
+      email: 'test@example.com'
     }
-
-    // Check password
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
-    }
-
-    // Generate token
-    const token = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.json({
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        avatar: user.avatar
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
-// Get current user
-router.get('/me', auth, async (req, res) => {
-  try {
-    res.json({
-      user: {
-        id: req.user._id,
-        name: req.user.name,
-        email: req.user.email,
-        avatar: req.user.avatar,
-        bio: req.user.bio
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Update profile
-router.put('/profile', auth, async (req, res) => {
-  try {
-    const { name, bio } = req.body;
-    
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { name, bio },
-      { new: true }
-    ).select('-password');
-
-    res.json({ user });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
+  });
 });
 
 module.exports = router;

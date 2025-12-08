@@ -1,9 +1,10 @@
+// server/middleware/uploadMiddleware.js
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Create uploads directory if it doesn't exist
-const uploadDir = path.join(__dirname, '../uploads');
+// Create uploads directory
+const uploadDir = 'uploads';
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -14,31 +15,30 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    // Generate unique filename
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const extension = path.extname(file.originalname);
-    cb(null, 'video-' + uniqueSuffix + extension);
+    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
   }
 });
 
 // File filter for videos
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['.mp4', '.avi', '.mov', '.wmv', '.mkv', '.webm'];
-  const fileExtension = path.extname(file.originalname).toLowerCase();
+  const allowedTypes = ['video/mp4', 'video/mov', 'video/avi', 'video/mkv', 'video/webm'];
   
-  if (allowedTypes.includes(fileExtension)) {
+  if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Only video files are allowed'), false);
+    cb(new Error('Only video files are allowed (mp4, mov, avi, mkv, webm)'), false);
   }
 };
 
+// Create multer instance
 const upload = multer({
   storage: storage,
-  fileFilter: fileFilter,
   limits: {
-    fileSize: 100 * 1024 * 1024 // 100MB limit
-  }
+    fileSize: 100 * 1024 * 1024 // 100MB
+  },
+  fileFilter: fileFilter
 });
 
-module.exports = upload;
+// Export middleware
+exports.uploadVideo = upload.single('video');
