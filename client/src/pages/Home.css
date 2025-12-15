@@ -1,0 +1,165 @@
+.home-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  max-width: 1440px;
+  margin: 0 auto;
+  gap: 16px;
+}
+
+.side-nav {
+  position: sticky;
+  top: 70px;
+  align-self: start;
+  padding: 12px;
+  border-right: 1px solid #eee;
+  height: calc(100vh - 90px);
+  overflow-y: auto;
+}
+
+.side-nav-section {
+  margin-bottom: 16px;
+}
+
+.side-nav-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #333;
+}
+
+.side-nav-item:hover {
+  background: #f2f2f2;
+}
+
+.side-nav-item.active {
+  background: #111;
+  color: #fff;
+}
+
+.home-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px 16px 32px;
+}
+
+.pill-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 8px 0 16px 0;
+}
+
+.pill {
+  border: 1px solid #e3e3e3;
+  background: #f7f7f7;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-weight: 600;
+  color: #444;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.pill-active {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.pill:hover {
+  background: #ececec;
+}
+
+.section {
+  margin-top: 20px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.section-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #111;
+}
+
+.section-meta {
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 260px;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 2px 8px 2px;
+}
+
+.rail::-webkit-scrollbar {
+  height: 8px;
+}
+
+.rail::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.rail::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+
+.rail::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+.rail-item {
+  min-width: 240px;
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 14px;
+  color: #555;
+}
+
+@media (max-width: 768px) {
+  .home-layout {
+    grid-template-columns: 1fr;
+  }
+  .side-nav {
+    display: none;
+  }
+  .home-shell {
+    padding: 12px 12px 20px;
+  }
+  .video-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+
+@media (max-width: 540px) {
+  .pill-row {
+    gap: 8px;
+  }
+  .pill {
+    padding: 7px 12px;
+  }
+  .section-header h2 {
+    font-size: 1.1rem;
+  }
+}
