@@ -345,5 +345,16 @@ export const dailymotionAPI = {
     if (!res.ok) throw new Error('Failed to search Dailymotion');
     const data = await res.json();
     return data.list || [];
+  },
+
+  getShortsByTopic: async (topic = 'shorts', page = 1, limit = 12) => {
+    const query = encodeURIComponent(topic);
+    const url = `${DM_BASE_URL}/videos?fields=id,title,thumbnail_url,views_total,duration,url,channel.name&search=${query}&page=${page}&limit=${limit}&sort=trending`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to load shorts');
+    const data = await res.json();
+    // Keep only reasonably short clips (<= 120s) for reel-like layout
+    const list = data.list || [];
+    return list.filter(item => (item.duration || 0) <= 120);
   }
 };

@@ -58,16 +58,19 @@
 }
 
 .nav-link {
-  color: #333;
+  color: #1f2937;
   text-decoration: none;
-  padding: 8px 12px;
-  border-radius: 6px;
-  transition: all 0.3s ease;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  border: 1px solid transparent;
+  transition: all 0.25s ease;
 }
 
 .nav-link:hover {
-  background: #667eea;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
   color: white;
+  box-shadow: 0 10px 20px rgba(124, 58, 237, 0.18);
 }
 
 /* Upload primary button */
@@ -76,6 +79,7 @@
   color: white !important;
   padding: 10px 16px;
   box-shadow: 0 6px 18px rgba(99,102,241,0.18);
+  border: none;
 }
 
 .upload-btn:hover {

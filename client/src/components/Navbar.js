@@ -89,10 +89,6 @@ function Navbar({ onToggleTheme, themeMode }) {
         <div className="nav-menu">
           <Link to="/" className="nav-link">Home</Link>
           <Link to="/media" className="nav-link">Videos</Link>
-          <Link to="/explore" className="nav-link">Explore</Link>
-          <Link to="/subscriptions" className="nav-link">Subscriptions</Link>
-          <Link to="/history" className="nav-link">History</Link>
-          <Link to="/watch-later" className="nav-link">Watch Later</Link>
           
           {user ? (
             <>

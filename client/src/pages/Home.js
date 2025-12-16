@@ -1,110 +1,52 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { mediaAPI, userAPI } from '../services/api';
+import { dailymotionAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import VideoCard from '../components/VideoCard';
 import './Home.css';
 
-const CATEGORIES = ['All', 'Education', 'Entertainment', 'Music', 'Gaming', 'Sports', 'Tech', 'Vlogs', 'News', 'Other'];
+const DM_TOPICS = ['all', 'music', 'gaming', 'sports', 'tech', 'news', 'movies', 'vlogs', 'education', 'comedy'];
 
 function Home() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
-  const [trending, setTrending] = useState([]);
-  const [latest, setLatest] = useState([]);
-  const [history, setHistory] = useState([]);
-  const [subsFeed, setSubsFeed] = useState([]);
-  const [category, setCategory] = useState('All');
-  const [loadingTrending, setLoadingTrending] = useState(true);
-  const [loadingLatest, setLoadingLatest] = useState(true);
-  const [loadingHistory, setLoadingHistory] = useState(true);
-  const [loadingSubs, setLoadingSubs] = useState(true);
-  const [error, setError] = useState('');
+  const { logout } = useAuth();
+  const [dmLongVideos, setDmLongVideos] = useState([]);
+  const [loadingDmLong, setLoadingDmLong] = useState(true);
+  const [dmLongError, setDmLongError] = useState('');
+  const [dmTopic, setDmTopic] = useState('all');
   const [activeNav, setActiveNav] = useState('home');
 
   // Section refs for scrolling
   const topRef = useRef(null);
-  const forYouRef = useRef(null);
-  const trendingRef = useRef(null);
-  const shortsRef = useRef(null);
-  const subsRef = useRef(null);
-  const historyRef = useRef(null);
 
-  useEffect(() => {
-    setLoadingTrending(true);
-    mediaAPI.getTrending()
-      .then(res => {
-        const list = Array.isArray(res) ? res : (res.media || []);
-        setTrending(list);
-      })
-      .catch(err => setError(err.message || 'Failed to load trending'))
-      .finally(() => setLoadingTrending(false));
-
-    setLoadingLatest(true);
-    mediaAPI.getAllMedia(1, 30)
-      .then(res => {
-        const list = res.media || res || [];
-        setLatest(list);
-      })
-      .catch(err => setError(err.message || 'Failed to load videos'))
-      .finally(() => setLoadingLatest(false));
-
-  }, []);
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!isAuthenticated) {
-      setHistory([]);
-      setLoadingHistory(false);
-      return;
+  const loadDmLong = async (topic) => {
+    setLoadingDmLong(true);
+    setDmLongError('');
+    try {
+      const list = topic === 'all'
+        ? await dailymotionAPI.getTrending(1, 12)
+        : await dailymotionAPI.search(topic, 1, 12);
+      const longOnly = (list || []).filter(v => (v.duration || 0) >= 180);
+      setDmLongVideos(longOnly.length ? longOnly : (list || []));
+    } catch (err) {
+      setDmLongError(err.message || 'Failed to load Dailymotion videos');
+      setDmLongVideos([]);
+    } finally {
+      setLoadingDmLong(false);
     }
-    setLoadingHistory(true);
-    userAPI.getWatchHistory()
-      .then(res => {
-        const list = res.history || res || [];
-        setHistory(list);
-      })
-      .catch(() => setHistory([]))
-      .finally(() => setLoadingHistory(false));
-  }, [authLoading, isAuthenticated]);
+  };
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!isAuthenticated || !user) {
-      setSubsFeed([]);
-      setLoadingSubs(false);
-      return;
-    }
-    setLoadingSubs(true);
-    const userId = user.id || user._id;
-    userAPI.getSubscriptions(userId)
-      .then(res => {
-        const list = res.media || res.subscriptions || res || [];
-        setSubsFeed(list);
-      })
-      .catch(() => setSubsFeed([]))
-      .finally(() => setLoadingSubs(false));
-  }, [authLoading, isAuthenticated, user]);
+    loadDmLong(dmTopic);
+  }, [dmTopic]);
 
   const sectionMap = {
-    home: topRef,
-    foryou: forYouRef,
-    trending: trendingRef,
-    shorts: shortsRef,
-    subscriptions: subsRef,
-    history: historyRef,
-    library: historyRef
+    home: topRef
   };
 
   const handleNavClick = (key) => {
     if (key === 'switch') {
       logout();
       navigate('/signin', { replace: true });
-      return;
-    }
-
-    if (key === 'myvideos') {
-      navigate('/my-uploads');
       return;
     }
 
@@ -122,31 +64,14 @@ function Home() {
     }
   };
 
-  const filteredLatest = useMemo(() => {
-    if (category === 'All') return latest;
-    return latest.filter(v => (v.category || '').toLowerCase() === category.toLowerCase());
-  }, [latest, category]);
-
-  const shorts = useMemo(() => {
-    if (latest.length === 0) return [];
-    const shortLike = latest.filter(v => (v.duration || 0) <= 90);
-    if (shortLike.length > 0) return shortLike.slice(0, 12);
-    return latest.slice(0, 12);
-  }, [latest]);
-
   return (
     <div className="home-layout" ref={topRef}>
       <aside className="side-nav">
         <div className="side-nav-section">
           <div className={`side-nav-item ${activeNav === 'home' ? 'active' : ''}`} onClick={() => handleNavClick('home')}>Home</div>
-          <div className={`side-nav-item ${activeNav === 'subscriptions' ? 'active' : ''}`} onClick={() => handleNavClick('subscriptions')}>Subscriptions</div>
-          <div className={`side-nav-item ${activeNav === 'library' ? 'active' : ''}`} onClick={() => handleNavClick('library')}>Library</div>
-          <div className={`side-nav-item ${activeNav === 'history' ? 'active' : ''}`} onClick={() => handleNavClick('history')}>History</div>
         </div>
         <div className="side-nav-section">
-          <div className={`side-nav-item ${activeNav === 'myvideos' ? 'active' : ''}`} onClick={() => handleNavClick('myvideos')}>My videos</div>
           <div className={`side-nav-item ${activeNav === 'uploads' ? 'active' : ''}`} onClick={() => handleNavClick('uploads')}>Upload</div>
-          <div className={`side-nav-item ${activeNav === 'trending' ? 'active' : ''}`} onClick={() => handleNavClick('trending')}>Trending</div>
         </div>
         <div className="side-nav-section">
           <div className="side-nav-item" onClick={() => handleNavClick('switch')}>Switch account</div>
@@ -154,101 +79,42 @@ function Home() {
       </aside>
 
       <div className="home-shell">
-        <div className="pill-row">
-        {CATEGORIES.map(cat => (
-          <button
-            key={cat}
-            className={`pill ${category === cat ? 'pill-active' : ''}`}
-            onClick={() => setCategory(cat)}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
-
-      <section className="section" ref={forYouRef}>
-        <div className="section-header">
-          <h2>For you</h2>
-          <span className="section-meta">{filteredLatest.length} videos</span>
-        </div>
-        {loadingLatest && <div className="loading">Loading feed...</div>}
-        {error && <div className="error">{error}</div>}
-        {!loadingLatest && !error && (
-          <div className="video-grid">
-            {filteredLatest.map(video => (
-              <VideoCard key={video._id} media={video} />
+        <section className="section">
+          <div className="section-header">
+            <h2>Dailymotion longform</h2>
+            <span className="section-meta">External · {dmTopic}</span>
+          </div>
+          <div className="dm-pill-row">
+            {DM_TOPICS.map(topic => (
+              <button
+                key={topic}
+                className={`dm-pill ${dmTopic === topic ? 'dm-pill-active' : ''}`}
+                onClick={() => setDmTopic(topic)}
+              >
+                {topic}
+              </button>
             ))}
           </div>
-        )}
-      </section>
-
-      <section className="section" ref={trendingRef}>
-        <div className="section-header">
-          <h2>Trending now</h2>
-          <span className="section-meta">Updated live</span>
-        </div>
-        {loadingTrending && <div className="loading">Loading trending...</div>}
-        {!loadingTrending && trending.length === 0 && (
-          <div className="error">No trending videos yet</div>
-        )}
-        <div className="video-grid">
-          {trending.map(video => (
-            <VideoCard key={video._id} media={video} />
-          ))}
-        </div>
-      </section>
-
-      <section className="section" ref={shortsRef}>
-        <div className="section-header">
-          <h2>Shorts</h2>
-          <span className="section-meta">Quick clips</span>
-        </div>
-        <div className="rail">
-          {shorts.map(video => (
-            <div key={video._id} className="rail-item">
-              <VideoCard media={video} compact />
+          {loadingDmLong && <div className="loading">Loading long videos...</div>}
+          {dmLongError && <div className="error">{dmLongError}</div>}
+          {!loadingDmLong && !dmLongError && (
+            <div className="dm-grid">
+              {dmLongVideos.map(video => (
+                <div key={video.id} className="dm-card" onClick={() => window.open(video.url, '_blank')} role="button">
+                  <div className="dm-thumb">
+                    <img src={video.thumbnail_url} alt={video.title} />
+                    <span className="dm-duration">{Math.max(0, video.duration)}s</span>
+                  </div>
+                  <div className="dm-body">
+                    <div className="dm-title" title={video.title}>{video.title}</div>
+                    <div className="dm-meta">{video['channel.name'] || 'Channel'} • {video.views_total || 0} views</div>
+                  </div>
+                </div>
+              ))}
+              {dmLongVideos.length === 0 && <div className="error">No long videos found</div>}
             </div>
-          ))}
-        </div>
-        {shorts.length === 0 && !loadingLatest && <div className="error">No shorts yet</div>}
-      </section>
-
-      <section className="section" ref={subsRef}>
-        <div className="section-header">
-          <h2>From your subscriptions</h2>
-          <span className="section-meta">Fresh uploads</span>
-        </div>
-        {loadingSubs && <div className="loading">Loading subscriptions...</div>}
-        {!loadingSubs && subsFeed.length === 0 && (
-          <div className="error">No subscription videos yet</div>
-        )}
-        <div className="rail">
-          {subsFeed.map(video => (
-            <div key={video._id} className="rail-item">
-              <VideoCard media={video} compact />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="section" ref={historyRef}>
-        <div className="section-header">
-          <h2>Watch history</h2>
-          <span className="section-meta">Recently watched</span>
-        </div>
-        {loadingHistory && <div className="loading">Loading history...</div>}
-        {!loadingHistory && history.length === 0 && <div className="error">No history yet</div>}
-        <div className="rail">
-          {history.map(item => {
-            const video = item.media || item;
-            return (
-              <div key={video._id} className="rail-item">
-                <VideoCard media={video} compact />
-              </div>
-            );
-          })}
-        </div>
-      </section>
+          )}
+        </section>
       </div>
     </div>
   );
