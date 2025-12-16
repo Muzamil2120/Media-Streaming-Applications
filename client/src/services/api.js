@@ -287,6 +287,21 @@ export const userAPI = {
     apiCall('/api/users/watch-history', {
       method: 'GET',
     }),
+
+  addToWatchLater: (mediaId) =>
+    apiCall(`/api/users/watch-later/${mediaId}`, {
+      method: 'POST',
+    }),
+
+  removeFromWatchLater: (mediaId) =>
+    apiCall(`/api/users/watch-later/${mediaId}`, {
+      method: 'DELETE',
+    }),
+
+  getWatchLater: () =>
+    apiCall('/api/users/watch-later', {
+      method: 'GET',
+    }),
   
   // list users for public browsing - UPDATED TO HANDLE BOTH FORMATS
   getAllUsers: async () => {

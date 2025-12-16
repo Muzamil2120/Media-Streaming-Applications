@@ -189,10 +189,39 @@ router.get('/search/:query', async (req, res) => {
 router.get('/trending/all', async (req, res) => {
   try {
     console.log('🔍 Fetching trending media');
-    const trendingMedia = await Media.find()
-      .sort({ views: -1, likes: -1 })
-      .limit(12);
-    
+    const now = new Date();
+
+    const trendingMedia = await Media.aggregate([
+      {
+        $addFields: {
+          commentsCount: { $size: { $ifNull: ['$comments', []] } },
+          ageDays: {
+            $divide: [
+              { $subtract: [now, '$createdAt'] },
+              1000 * 60 * 60 * 24
+            ]
+          }
+        }
+      },
+      {
+        $addFields: {
+          recencyScore: {
+            $max: [0, { $subtract: [1, { $divide: ['$ageDays', 14] }] }]
+          },
+          trendingScore: {
+            $add: [
+              { $multiply: ['$views', 0.6] },
+              { $multiply: ['$likes', 0.3] },
+              { $multiply: ['$commentsCount', 0.2] },
+              { $multiply: [{ $max: [0, { $subtract: [1, { $divide: ['$ageDays', 14] }] }] }, 100] }
+            ]
+          }
+        }
+      },
+      { $sort: { trendingScore: -1, createdAt: -1 } },
+      { $limit: 12 }
+    ]);
+
     console.log(`✅ Found ${trendingMedia.length} trending items`);
     res.json(trendingMedia);
   } catch (error) {

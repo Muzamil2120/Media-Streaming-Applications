@@ -131,6 +131,7 @@ router.get('/:id/subscriptions', auth, async (req, res) => {
       uploader: { $in: subscriptionIds },
       isPublic: true
     })
+      .populate('uploader', 'name avatar username')
       .sort({ createdAt: -1 })
       .limit(50);
 
@@ -171,6 +172,9 @@ router.get('/:id', async (req, res) => {
 router.get('/:id/uploads', async (req, res) => {
   try {
     console.log('🔍 Fetching uploads for user ID:', req.params.id);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const skip = (page - 1) * limit;
     
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -185,14 +189,76 @@ router.get('/:id/uploads', async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    const uploads = await Media.find({ uploadedBy: req.params.id })
+    const uploads = await Media.find({ uploader: req.params.id })
+      .populate('uploader', 'name avatar username')
       .sort({ createdAt: -1 })
-      .limit(12);
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Media.countDocuments({ uploader: req.params.id });
     
     console.log(`✅ Found ${uploads.length} uploads for user ${user.username}`);
-    res.json(uploads);
+    res.json({
+      uploads,
+      total,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page
+    });
   } catch (error) {
     console.error('❌ Error fetching user uploads:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Watch later - add
+router.post('/watch-later/:mediaId', auth, async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(mediaId)) {
+      return res.status(400).json({ message: 'Invalid media ID format' });
+    }
+
+    const media = await Media.findById(mediaId);
+    if (!media) return res.status(404).json({ message: 'Media not found' });
+
+    await User.findByIdAndUpdate(req.user.id, {
+      $addToSet: { watchLater: mediaId }
+    });
+
+    res.json({ message: 'Added to watch later' });
+  } catch (error) {
+    console.error('❌ Error adding to watch later:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Watch later - remove
+router.delete('/watch-later/:mediaId', auth, async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    await User.findByIdAndUpdate(req.user.id, {
+      $pull: { watchLater: mediaId }
+    });
+    res.json({ message: 'Removed from watch later' });
+  } catch (error) {
+    console.error('❌ Error removing from watch later:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Watch later - list
+router.get('/watch-later', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).populate({
+      path: 'watchLater',
+      populate: { path: 'uploader', select: 'name avatar username' }
+    });
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    res.json({ watchLater: user.watchLater || [] });
+  } catch (error) {
+    console.error('❌ Error fetching watch later:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

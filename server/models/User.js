@@ -29,6 +29,10 @@ const userSchema = new mongoose.Schema({
     trim: true,
     default: ''
   },
+  banner: {
+    type: String,
+    default: ''
+  },
   avatar: {
     type: String,
     default: ''
@@ -50,6 +54,10 @@ const userSchema = new mongoose.Schema({
       type: Date,
       default: Date.now
     }
+  }],
+  watchLater: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Media'
   }]
 }, {
   timestamps: true
@@ -59,6 +67,7 @@ const userSchema = new mongoose.Schema({
 userSchema.path('subscriptions').default([]);
 userSchema.path('subscribers').default([]);
 userSchema.path('watchHistory').default([]);
+userSchema.path('watchLater').default([]);
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {

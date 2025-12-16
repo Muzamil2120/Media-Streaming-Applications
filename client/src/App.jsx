@@ -1,10 +1,10 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useMemo, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SnackbarProvider } from 'notistack';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { AuthProvider } from './context/AuthContext';
-import theme from './theme';
+import createAppTheme from './theme';
 
 // Layout
 import Layout from './components/layout/Layout';
@@ -45,6 +45,16 @@ const PageLoader = () => (
 );
 
 function App() {
+  const [mode, setMode] = useState(() => localStorage.getItem('themeMode') || 'light');
+  const theme = useMemo(() => createAppTheme(mode), [mode]);
+  const toggleTheme = () => {
+    setMode((prev) => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      localStorage.setItem('themeMode', next);
+      return next;
+    });
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -66,7 +76,7 @@ function App() {
               } />
 
               {/* Main Layout Routes */}
-              <Route path="/" element={<Layout />}>
+              <Route path="/" element={<Layout onToggleTheme={toggleTheme} themeMode={mode} />}>
                 <Route index element={
                   <Suspense fallback={<PageLoader />}>
                     <HomePage />
