@@ -1,48 +1,48 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Card, CardActionArea, CardContent, CardMedia, Grid, Stack, Typography } from '@mui/material';
+import { Box, Button, Card, CardActionArea, CardContent, CardMedia, Grid, Stack, Typography } from '@mui/material';
 import { userAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { useAuth } from '../context/AuthContext';
 
 const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:5002';
 
-const HistoryPage = () => {
+const WatchLaterPage = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setItems([]);
+  const load = async () => {
+    try {
+      const res = await userAPI.getWatchLater();
+      setItems(res.watchLater || []);
+    } catch (err) {
+      console.error('Failed to load watch later', err);
+    } finally {
       setLoading(false);
-      return;
     }
-    const load = async () => {
-      try {
-        const res = await userAPI.getWatchHistory();
-        const list = res.history || [];
-        setItems(list);
-      } catch (err) {
-        console.error('Failed to load history', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  };
+
+  useEffect(() => {
     load();
-  }, [isAuthenticated]);
+  }, []);
+
+  const handleRemove = async (id) => {
+    try {
+      await userAPI.removeFromWatchLater(id);
+      await load();
+    } catch (err) {
+      console.error('Failed to remove', err);
+    }
+  };
 
   if (loading) return <LoadingSpinner />;
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} mb={2}>Watch History</Typography>
-      {items.length === 0 && <Typography color="text.secondary">No history yet.</Typography>}
+      <Typography variant="h5" fontWeight={700} mb={2}>Watch Later</Typography>
+      {items.length === 0 && <Typography color="text.secondary">No videos saved for later.</Typography>}
       <Grid container spacing={2}>
-        {items.map((entry) => {
-          const video = entry.media;
-          if (!video) return null;
+        {items.map((video) => {
           const thumb = video.thumbnail
             ? (video.thumbnail.startsWith('http') ? video.thumbnail : `${apiBase}${video.thumbnail}`)
             : undefined;
@@ -54,10 +54,13 @@ const HistoryPage = () => {
                   <CardContent>
                     <Stack spacing={0.5}>
                       <Typography variant="subtitle1" fontWeight={700} noWrap>{video.title}</Typography>
-                      <Typography variant="caption" color="text.secondary">Watched on {new Date(entry.watchedAt).toLocaleString()}</Typography>
+                      <Typography variant="body2" color="text.secondary" noWrap>{video.description || 'No description'}</Typography>
                     </Stack>
                   </CardContent>
                 </CardActionArea>
+                <Button onClick={() => handleRemove(video._id)} sx={{ m: 1 }} color="secondary" variant="outlined">
+                  Remove
+                </Button>
               </Card>
             </Grid>
           );
@@ -67,4 +70,4 @@ const HistoryPage = () => {
   );
 };
 
-export default HistoryPage;
+export default WatchLaterPage;

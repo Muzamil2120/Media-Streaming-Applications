@@ -31,6 +31,9 @@ const MonetizationPage = lazy(() => import('./pages/MonetizationPage'));
 const MyUploadsPage = lazy(() => import('./pages/MyUploads'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
+const ChannelPage = lazy(() => import('./pages/ChannelPage'));
+const ExplorePage = lazy(() => import('./pages/ExplorePage'));
+const WatchLaterPage = lazy(() => import('./pages/WatchLaterPage'));
 
 // No theme configured (project does not include @mui dependencies)
 
@@ -163,6 +166,21 @@ function App() {
                     <SubscriptionsPage />
                   </Suspense>
                 } />
+                <Route path="explore" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ExplorePage />
+                  </Suspense>
+                } />
+                <Route path="channel/:id" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ChannelPage />
+                  </Suspense>
+                } />
+                <Route path="channel/me" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ChannelPage />
+                  </Suspense>
+                } />
                 <Route path="history" element={
                   <Suspense fallback={<PageLoader />}>
                     <HistoryPage />
@@ -171,6 +189,11 @@ function App() {
                 <Route path="liked" element={
                   <Suspense fallback={<PageLoader />}>
                     <LikedVideosPage />
+                  </Suspense>
+                } />
+                <Route path="watch-later" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <WatchLaterPage />
                   </Suspense>
                 } />
                 <Route path="my-uploads" element={

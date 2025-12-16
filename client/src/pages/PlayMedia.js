@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { mediaAPI, commentAPI } from '../services/api';
+import { useParams, useNavigate } from 'react-router-dom';
+import { mediaAPI, commentAPI, userAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import {
   Box,
   Button,
@@ -33,6 +34,9 @@ function PlayMedia() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [liked, setLiked] = useState(false);
+  const [savingLater, setSavingLater] = useState(false);
+  const [savedLater, setSavedLater] = useState(false);
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     setLoading(true);
@@ -43,6 +47,9 @@ function PlayMedia() {
         setMedia(m);
         setLiked(!!m?.liked); // backend may set liked flag
         setLoading(false);
+        if (isAuthenticated) {
+          userAPI.addToWatchHistory(id).catch(() => {});
+        }
       })
       .catch(err => {
         setError(err.message || 'Failed to load video');
@@ -54,7 +61,7 @@ function PlayMedia() {
     commentAPI.getComments(id)
       .then(res => setComments(res.comments || res || []))
       .catch(() => setComments([]));
-  }, [id]);
+  }, [id, isAuthenticated]);
 
   const videoSrc = useMemo(() => {
     if (!media || !media.filePath) return '';
@@ -83,6 +90,19 @@ function PlayMedia() {
       setLiked(!nextLiked);
       setMedia((m) => ({ ...m, likes: Math.max(0, (m?.likes || 0) + (nextLiked ? -1 : 1)) }));
     });
+  };
+
+  const handleWatchLater = async () => {
+    if (!media) return;
+    try {
+      setSavingLater(true);
+      await userAPI.addToWatchLater(media._id);
+      setSavedLater(true);
+    } catch (err) {
+      console.error('Add to watch later failed', err);
+    } finally {
+      setSavingLater(false);
+    }
   };
 
   const handleComment = (e) => {
@@ -124,6 +144,9 @@ function PlayMedia() {
                   </IconButton>
                   <Typography variant="body2" color="text.secondary">{media.likes || 0}</Typography>
                   {media.category && <Chip size="small" label={media.category} />}
+                  <Button size="small" variant="outlined" onClick={handleWatchLater} disabled={savingLater}>
+                    {savedLater ? 'Saved' : 'Watch later'}
+                  </Button>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Typography variant="subtitle2">{media.uploader?.name || media.uploader?.username || 'Unknown uploader'}</Typography>

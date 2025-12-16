@@ -57,6 +57,59 @@ router.get('/watch-history', auth, async (req, res) => {
   }
 });
 
+// Watch later - add
+router.post('/watch-later/:mediaId', auth, async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(mediaId)) {
+      return res.status(400).json({ message: 'Invalid media ID format' });
+    }
+
+    const media = await Media.findById(mediaId);
+    if (!media) return res.status(404).json({ message: 'Media not found' });
+
+    await User.findByIdAndUpdate(req.user.id, {
+      $addToSet: { watchLater: mediaId }
+    });
+
+    res.json({ message: 'Added to watch later' });
+  } catch (error) {
+    console.error('❌ Error adding to watch later:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Watch later - remove
+router.delete('/watch-later/:mediaId', auth, async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    await User.findByIdAndUpdate(req.user.id, {
+      $pull: { watchLater: mediaId }
+    });
+    res.json({ message: 'Removed from watch later' });
+  } catch (error) {
+    console.error('❌ Error removing from watch later:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Watch later - list
+router.get('/watch-later', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).populate({
+      path: 'watchLater',
+      populate: { path: 'uploader', select: 'name avatar username' }
+    });
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    res.json({ watchLater: user.watchLater || [] });
+  } catch (error) {
+    console.error('❌ Error fetching watch later:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Subscribe to a user
 router.post('/:id/subscribe', auth, async (req, res) => {
   try {
@@ -210,58 +263,6 @@ router.get('/:id/uploads', async (req, res) => {
   }
 });
 
-// Watch later - add
-router.post('/watch-later/:mediaId', auth, async (req, res) => {
-  try {
-    const { mediaId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(mediaId)) {
-      return res.status(400).json({ message: 'Invalid media ID format' });
-    }
-
-    const media = await Media.findById(mediaId);
-    if (!media) return res.status(404).json({ message: 'Media not found' });
-
-    await User.findByIdAndUpdate(req.user.id, {
-      $addToSet: { watchLater: mediaId }
-    });
-
-    res.json({ message: 'Added to watch later' });
-  } catch (error) {
-    console.error('❌ Error adding to watch later:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
-// Watch later - remove
-router.delete('/watch-later/:mediaId', auth, async (req, res) => {
-  try {
-    const { mediaId } = req.params;
-    await User.findByIdAndUpdate(req.user.id, {
-      $pull: { watchLater: mediaId }
-    });
-    res.json({ message: 'Removed from watch later' });
-  } catch (error) {
-    console.error('❌ Error removing from watch later:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
-// Watch later - list
-router.get('/watch-later', auth, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id).populate({
-      path: 'watchLater',
-      populate: { path: 'uploader', select: 'name avatar username' }
-    });
-
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    res.json({ watchLater: user.watchLater || [] });
-  } catch (error) {
-    console.error('❌ Error fetching watch later:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
 
 // Get all users
 router.get('/', async (req, res) => {

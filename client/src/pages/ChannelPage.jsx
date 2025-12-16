@@ -14,7 +14,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
-import { mediaAPI, userAPI } from '../services/api';
+import { userAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:5002';

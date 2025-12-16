@@ -50,7 +50,7 @@ function Profile() {
       });
 
     userAPI.getUserUploads(targetId)
-      .then(res => { if (mounted) setUploads(res.media || []); })
+      .then(res => { if (mounted) setUploads(res.uploads || res.media || res || []); })
       .catch(() => {});
 
     return () => { mounted = false; };

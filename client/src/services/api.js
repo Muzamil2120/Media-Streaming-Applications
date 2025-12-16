@@ -1,4 +1,5 @@
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5002';
+const DM_BASE_URL = 'https://api.dailymotion.com';
 
 // Add this line for debugging
 console.log('🔗 Using API URL:', API_BASE_URL);
@@ -326,4 +327,23 @@ export const userAPI = {
       return [];
     }
   },
+};
+
+// Dailymotion API (public)
+export const dailymotionAPI = {
+  getTrending: async (page = 1, limit = 20) => {
+    const url = `${DM_BASE_URL}/videos?fields=id,title,description,thumbnail_url,views_total,duration,url,channel.name&sort=trending&page=${page}&limit=${limit}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to load Dailymotion trending');
+    const data = await res.json();
+    return data.list || [];
+  },
+
+  search: async (query, page = 1, limit = 20) => {
+    const url = `${DM_BASE_URL}/videos?fields=id,title,description,thumbnail_url,views_total,duration,url,channel.name&search=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to search Dailymotion');
+    const data = await res.json();
+    return data.list || [];
+  }
 };

@@ -49,6 +49,15 @@ function Home() {
       .catch(err => setError(err.message || 'Failed to load videos'))
       .finally(() => setLoadingLatest(false));
 
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      setHistory([]);
+      setLoadingHistory(false);
+      return;
+    }
     setLoadingHistory(true);
     userAPI.getWatchHistory()
       .then(res => {
@@ -57,7 +66,7 @@ function Home() {
       })
       .catch(() => setHistory([]))
       .finally(() => setLoadingHistory(false));
-  }, []);
+  }, [authLoading, isAuthenticated]);
 
   useEffect(() => {
     if (authLoading) return;

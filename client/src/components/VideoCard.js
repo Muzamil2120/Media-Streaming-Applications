@@ -1,12 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import './VideoCard.css';
 
 const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:5002';
 
 function VideoCard({ media, onDelete }) {
-  const [isHovered, setIsHovered] = useState(false);
-
   const formatViews = (views) => {
     if (views >= 1000000) return (views / 1000000).toFixed(1) + 'M';
     if (views >= 1000) return (views / 1000).toFixed(1) + 'K';
