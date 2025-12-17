@@ -6,7 +6,6 @@ import {
   Button,
   Card,
   CardContent,
-  Grid,
   LinearProgress,
   MenuItem,
   Stack,
@@ -17,6 +16,7 @@ import {
 
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500MB
 const MAX_THUMB_SIZE = 5 * 1024 * 1024; // 5MB
+const CATEGORIES = ['Education', 'Entertainment', 'Music', 'Gaming', 'Sports', 'Tech', 'Vlogs', 'News', 'Other'];
 
 // Helper: upload using XHR so we can report progress
 function uploadWithProgress(url, formData, token, onProgress) {
@@ -41,7 +41,14 @@ function uploadWithProgress(url, formData, token, onProgress) {
             resolve({});
           }
         } else {
-          reject(new Error(xhr.responseText || `Upload failed (${xhr.status})`));
+          let message = xhr.responseText || `Upload failed (${xhr.status})`;
+          try {
+            const parsed = JSON.parse(xhr.responseText || '{}');
+            message = parsed.message || message;
+          } catch (_) {
+            // ignore parse failure
+          }
+          reject(new Error(message));
         }
       }
     };
@@ -56,7 +63,7 @@ export default function UploadPage() {
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState('Other');
   const [tags, setTags] = useState('');
   const [privacy, setPrivacy] = useState('public');
   const [thumbnail, setThumbnail] = useState(null);
@@ -155,7 +162,7 @@ export default function UploadPage() {
     setProgress(0);
 
     // Use API base from services (falls back to REACT_APP_API_URL)
-    const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:5002';
     const url = `${apiBase}/api/media/upload`;
     const token = localStorage.getItem('token');
 
@@ -192,14 +199,22 @@ export default function UploadPage() {
             <TextField label="Title" required value={title} onChange={(e) => setTitle(e.target.value)} inputProps={{ maxLength: 120 }} />
             <TextField label="Description" multiline rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
 
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField label="Category" placeholder="e.g. Music, Education" value={category} onChange={(e) => setCategory(e.target.value)} fullWidth />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField label="Tags (comma separated)" placeholder="tag1, tag2" value={tags} onChange={(e) => setTags(e.target.value)} fullWidth />
-              </Grid>
-            </Grid>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+              <TextField
+                select
+                label="Category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                fullWidth
+              >
+                {CATEGORIES.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField label="Tags (comma separated)" placeholder="tag1, tag2" value={tags} onChange={(e) => setTags(e.target.value)} fullWidth />
+            </Box>
 
             <TextField select label="Privacy" value={privacy} onChange={(e) => setPrivacy(e.target.value)} fullWidth>
               <MenuItem value="public">Public</MenuItem>
@@ -207,34 +222,30 @@ export default function UploadPage() {
               <MenuItem value="unlisted">Unlisted</MenuItem>
             </TextField>
 
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} sm={6}>
-                <Button variant="outlined" component="label" fullWidth>
-                  Choose Thumbnail (optional)
-                  <input hidden type="file" accept="image/*" onChange={handleThumbnail} />
-                </Button>
-              </Grid>
-              <Grid item xs={12} sm={6}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, alignItems: 'center' }}>
+              <Button variant="outlined" component="label" fullWidth>
+                Choose Thumbnail (optional)
+                <input hidden type="file" accept="image/*" onChange={handleThumbnail} />
+              </Button>
+              <Box>
                 {thumbnail && (
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                     <img ref={thumbPreviewRef} alt="thumb preview" style={{ maxWidth: 140, borderRadius: 8 }} />
                     <Typography variant="body2">{thumbnail.name}</Typography>
                   </Box>
                 )}
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
 
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} sm={6}>
-                <Button variant="contained" component="label" fullWidth>
-                  Choose Video File *
-                  <input hidden type="file" accept="video/*" onChange={handleVideo} />
-                </Button>
-              </Grid>
-              <Grid item xs={12} sm={6}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, alignItems: 'center' }}>
+              <Button variant="contained" component="label" fullWidth>
+                Choose Video File *
+                <input hidden type="file" accept="video/*" onChange={handleVideo} />
+              </Button>
+              <Box>
                 {videoFile && <Typography variant="body2">{videoFile.name}</Typography>}
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
 
             {uploading && (
               <Box>

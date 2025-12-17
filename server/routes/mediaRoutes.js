@@ -79,8 +79,15 @@ router.post('/upload', requireAuth, upload.fields([{ name: 'video', maxCount: 1 
     const videoFile = req.files && req.files.video && req.files.video[0];
     const thumbFile = req.files && req.files.thumbnail && req.files.thumbnail[0];
 
+    // Ensure uploader exists to avoid mongoose validation errors
+    const uploaderId = req.user && req.user.id ? req.user.id : req.body.uploaderId;
+
     if (!videoFile) {
       return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    if (!uploaderId) {
+      return res.status(401).json({ message: 'Authentication required to upload' });
     }
 
     const media = new Media({
@@ -91,10 +98,10 @@ router.post('/upload', requireAuth, upload.fields([{ name: 'video', maxCount: 1 
       filePath: `/uploads/${videoFile.filename}`,
       fileSize: videoFile.size,
       thumbnail: thumbFile ? `/uploads/${thumbFile.filename}` : '',
-      category,
+      category: category || 'Other',
       tags: tags ? tags.split(',').map(tag => tag.trim()) : [],
       isPublic: isPublic !== 'false',
-      uploader: req.user && req.user.id ? req.user.id : null
+      uploader: uploaderId
     });
 
     await media.save();
@@ -105,6 +112,7 @@ router.post('/upload', requireAuth, upload.fields([{ name: 'video', maxCount: 1 
       media 
     });
   } catch (error) {
+    console.error('Upload error:', error);
     res.status(500).json({ message: 'Upload failed', error: error.message });
   }
 });

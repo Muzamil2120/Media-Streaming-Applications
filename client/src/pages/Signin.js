@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './Auth.css';
@@ -12,7 +12,14 @@ function Signin() {
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = location.state && location.state.from ? location.state.from : '/';
+  const prefillEmail = location.state?.prefillEmail || new URLSearchParams(location.search).get('email');
   const { signin, loginLocal } = useAuth();
+
+  useEffect(() => {
+    if (prefillEmail) {
+      setFormData((prev) => ({ ...prev, email: prefillEmail }));
+    }
+  }, [prefillEmail]);
 
   const handleChange = (e) => {
     setFormData({
@@ -44,6 +51,7 @@ function Signin() {
     <div className="auth-container">
       <div className="auth-card">
         <h2>Sign In to Your Account</h2>
+        {prefillEmail && <div className="info-message">Signing in as <strong>{prefillEmail}</strong>. Enter the password to continue.</div>}
         <form onSubmit={handleSubmit} className="auth-form">
           {error && <div className="error-message">{error}</div>}
           

@@ -10,7 +10,6 @@ import {
   CardContent,
   CardMedia,
   Chip,
-  Grid,
   IconButton,
   Stack,
   Typography,
@@ -73,7 +72,7 @@ export default function MyUploads() {
           <Button variant="contained" onClick={() => navigate('/upload')}>Upload a video</Button>
         </Box>
       ) : (
-        <Grid container spacing={2}>
+        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' } }}>
           {videos.map((video) => {
             const duration = video.duration ? `${Math.floor(video.duration / 60)}:${(video.duration % 60).toString().padStart(2, '0')}` : '0:00';
             const thumb = video.thumbnail
@@ -83,56 +82,54 @@ export default function MyUploads() {
               ? (video.filePath.startsWith('http') ? video.filePath : `${apiBase}${video.filePath}`)
               : undefined;
             return (
-              <Grid item xs={12} sm={6} md={4} key={video._id}>
-                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                  <CardActionArea onClick={() => navigate(`/media/play/${video._id}`)}>
-                    {source ? (
-                      <CardMedia
-                        component="video"
-                        src={source}
-                        poster={thumb || undefined}
-                        title={video.title}
-                        controls
-                        sx={{ height: 190, backgroundColor: '#000' }}
-                      />
-                    ) : (
-                      <CardMedia
-                        component="img"
-                        image={thumb || '/placeholder.jpg'}
-                        title={video.title}
-                        sx={{ height: 190, backgroundColor: '#000', objectFit: 'cover' }}
-                      />
-                    )}
-                  </CardActionArea>
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Stack spacing={1}>
-                      <Typography variant="subtitle1" fontWeight={700} noWrap>{video.title}</Typography>
-                      <Typography variant="body2" color="text.secondary" noWrap>{video.description || 'No description'}</Typography>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Chip size="small" label={video.category || 'Other'} />
-                        <Typography variant="caption" color="text.secondary">{duration}</Typography>
-                        <Typography variant="caption" color="text.secondary">{(video.views || 0)} views</Typography>
-                        {video.createdAt && (
-                          <Typography variant="caption" color="text.secondary">
-                            {new Date(video.createdAt).toLocaleDateString()}
-                          </Typography>
-                        )}
-                      </Stack>
+              <Card key={video._id} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <CardActionArea onClick={() => navigate(`/media/play/${video._id}`)}>
+                  {source ? (
+                    <CardMedia
+                      component="video"
+                      src={source}
+                      poster={thumb || undefined}
+                      title={video.title}
+                      controls
+                      sx={{ height: 190, backgroundColor: '#000' }}
+                    />
+                  ) : (
+                    <CardMedia
+                      component="img"
+                      image={thumb || '/placeholder.jpg'}
+                      title={video.title}
+                      sx={{ height: 190, backgroundColor: '#000', objectFit: 'cover' }}
+                    />
+                  )}
+                </CardActionArea>
+                <CardContent sx={{ flexGrow: 1 }}>
+                  <Stack spacing={1}>
+                    <Typography variant="subtitle1" fontWeight={700} noWrap>{video.title}</Typography>
+                    <Typography variant="body2" color="text.secondary" noWrap>{video.description || 'No description'}</Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Chip size="small" label={video.category || 'Other'} />
+                      <Typography variant="caption" color="text.secondary">{duration}</Typography>
+                      <Typography variant="caption" color="text.secondary">{(video.views || 0)} views</Typography>
+                      {video.createdAt && (
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(video.createdAt).toLocaleDateString()}
+                        </Typography>
+                      )}
                     </Stack>
-                  </CardContent>
-                  <Stack direction="row" spacing={1} sx={{ px: 2, pb: 2 }}>
-                    <Button startIcon={<PlayArrowIcon />} variant="outlined" onClick={() => navigate(`/media/play/${video._id}`)}>
-                      Play
-                    </Button>
-                    <IconButton aria-label="edit" onClick={() => navigate(`/media/edit/${video._id}`)}>
-                      <EditIcon />
-                    </IconButton>
                   </Stack>
-                </Card>
-              </Grid>
+                </CardContent>
+                <Stack direction="row" spacing={1} sx={{ px: 2, pb: 2 }}>
+                  <Button startIcon={<PlayArrowIcon />} variant="outlined" onClick={() => navigate(`/media/play/${video._id}`)}>
+                    Play
+                  </Button>
+                  <IconButton aria-label="edit" onClick={() => navigate(`/media/edit/${video._id}`)}>
+                    <EditIcon />
+                  </IconButton>
+                </Stack>
+              </Card>
             );
           })}
-        </Grid>
+        </Box>
       )}
     </Box>
   );

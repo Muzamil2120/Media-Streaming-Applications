@@ -1,117 +1,103 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { dailymotionAPI } from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { useNavigate, useOutletContext } from 'react-router-dom';
+import { mediaAPI, dailymotionAPI } from '../services/api';
+import { formatDuration } from '../utils/formatters';
 import './Home.css';
 
-const DM_TOPICS = ['all', 'music', 'gaming', 'sports', 'tech', 'news', 'movies', 'vlogs', 'education', 'comedy'];
-
-function Home() {
+function Home({ initialNav = 'home' }) {
   const navigate = useNavigate();
-  const { logout } = useAuth();
-  const [dmLongVideos, setDmLongVideos] = useState([]);
-  const [loadingDmLong, setLoadingDmLong] = useState(true);
-  const [dmLongError, setDmLongError] = useState('');
-  const [dmTopic, setDmTopic] = useState('all');
-  const [activeNav, setActiveNav] = useState('home');
+  const [videos, setVideos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const outletCtx = useOutletContext();
+  const sidebarOpen = outletCtx && typeof outletCtx.sidebarOpen !== 'undefined' ? outletCtx.sidebarOpen : true;
 
   // Section refs for scrolling
   const topRef = useRef(null);
 
-  const loadDmLong = async (topic) => {
-    setLoadingDmLong(true);
-    setDmLongError('');
+  const loadVideos = async () => {
+    setLoading(true);
+    setError('');
     try {
-      const list = topic === 'all'
-        ? await dailymotionAPI.getTrending(1, 12)
-        : await dailymotionAPI.search(topic, 1, 12);
-      const longOnly = (list || []).filter(v => (v.duration || 0) >= 180);
-      setDmLongVideos(longOnly.length ? longOnly : (list || []));
+      const [localData, dmData] = await Promise.all([
+        mediaAPI.getAllMedia().catch(() => []),
+        dailymotionAPI.getTrending().catch(() => [])
+      ]);
+
+      const normalizedDM = dmData.map(video => ({
+        _id: video.id,
+        title: video.title,
+        description: video.description,
+        thumbnailUrl: video.thumbnail_url,
+        views: video.views_total,
+        duration: formatDuration(video.duration),
+        uploader: {
+          _id: 'dailymotion',
+          username: video['channel.name'] || 'Dailymotion',
+          avatar: null
+        },
+        created: new Date(),
+        isDailymotion: true
+      }));
+
+      const localVideos = Array.isArray(localData) ? localData : (localData.media || []);
+      const normalizedLocal = localVideos.map(video => ({
+        ...video,
+        thumbnailUrl: video.thumbnail || video.thumbnailUrl,
+        uploader: video.uploader || video.postedBy || { username: 'Unknown' },
+        duration: typeof video.duration === 'number' ? formatDuration(video.duration) : video.duration
+      }));
+
+      setVideos([...normalizedLocal, ...normalizedDM]);
     } catch (err) {
-      setDmLongError(err.message || 'Failed to load Dailymotion videos');
-      setDmLongVideos([]);
+      setError(err.message || 'Failed to load videos');
+      setVideos([]);
     } finally {
-      setLoadingDmLong(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadDmLong(dmTopic);
-  }, [dmTopic]);
-
-  const sectionMap = {
-    home: topRef
-  };
-
-  const handleNavClick = (key) => {
-    if (key === 'switch') {
-      logout();
-      navigate('/signin', { replace: true });
-      return;
-    }
-
-    if (key === 'uploads') {
-      navigate('/upload');
-      return;
-    }
-
-    setActiveNav(key);
-    const ref = sectionMap[key];
-    if (ref && ref.current) {
-      ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else if (topRef.current) {
-      topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
+    loadVideos();
+  }, []);
 
   return (
-    <div className="home-layout" ref={topRef}>
-      <aside className="side-nav">
-        <div className="side-nav-section">
-          <div className={`side-nav-item ${activeNav === 'home' ? 'active' : ''}`} onClick={() => handleNavClick('home')}>Home</div>
-        </div>
-        <div className="side-nav-section">
-          <div className={`side-nav-item ${activeNav === 'uploads' ? 'active' : ''}`} onClick={() => handleNavClick('uploads')}>Upload</div>
-        </div>
-        <div className="side-nav-section">
-          <div className="side-nav-item" onClick={() => handleNavClick('switch')}>Switch account</div>
-        </div>
-      </aside>
-
+    <div className={`home-layout ${sidebarOpen ? '' : 'sidebar-collapsed'}`} ref={topRef}>
       <div className="home-shell">
         <section className="section">
           <div className="section-header">
-            <h2>Dailymotion longform</h2>
-            <span className="section-meta">External · {dmTopic}</span>
+            <h2>Recommended</h2>
           </div>
-          <div className="dm-pill-row">
-            {DM_TOPICS.map(topic => (
-              <button
-                key={topic}
-                className={`dm-pill ${dmTopic === topic ? 'dm-pill-active' : ''}`}
-                onClick={() => setDmTopic(topic)}
-              >
-                {topic}
-              </button>
-            ))}
-          </div>
-          {loadingDmLong && <div className="loading">Loading long videos...</div>}
-          {dmLongError && <div className="error">{dmLongError}</div>}
-          {!loadingDmLong && !dmLongError && (
+          
+          {loading && <div className="loading">Loading videos...</div>}
+          {error && <div className="error">{error}</div>}
+          {!loading && !error && videos.length === 0 && (
+            <div className="no-videos">No videos found. Be the first to upload!</div>
+          )}
+          
+          {!loading && !error && videos.length > 0 && (
             <div className="dm-grid">
-              {dmLongVideos.map(video => (
-                <div key={video.id} className="dm-card" onClick={() => window.open(video.url, '_blank')} role="button">
-                  <div className="dm-thumb">
-                    <img src={video.thumbnail_url} alt={video.title} />
-                    <span className="dm-duration">{Math.max(0, video.duration)}s</span>
+              {videos.map(video => (
+                <div key={video._id} className="dm-card" onClick={() => navigate(`/media/play/${video._id}`)}>
+                  <div className="dm-thumb-wrapper">
+                    <img 
+                      src={video.thumbnailUrl || 'https://via.placeholder.com/320x180?text=No+Thumbnail'} 
+                      alt={video.title} 
+                      className="dm-thumb" 
+                    />
+                    <span className="dm-duration">
+                      {video.duration || '0:00'}
+                    </span>
                   </div>
-                  <div className="dm-body">
-                    <div className="dm-title" title={video.title}>{video.title}</div>
-                    <div className="dm-meta">{video['channel.name'] || 'Channel'} • {video.views_total || 0} views</div>
+                  <div className="dm-info">
+                    <h3 className="dm-title" title={video.title}>{video.title}</h3>
+                    <div className="dm-meta">
+                      <span>{video.uploader?.username || video.uploader?.name || 'Unknown User'}</span>
+                      <span>{video.views ? `${video.views} views` : 'No views'}</span>
+                    </div>
                   </div>
                 </div>
               ))}
-              {dmLongVideos.length === 0 && <div className="error">No long videos found</div>}
             </div>
           )}
         </section>

@@ -6,7 +6,8 @@ import './Profile.css';
 import { useAuth } from '../context/AuthContext';
 
 function Profile() {
-  const { id } = useParams();
+  const { id: rawId } = useParams();
+  const routeId = rawId && rawId !== 'undefined' ? rawId : undefined;
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [uploads, setUploads] = useState([]);
@@ -18,13 +19,13 @@ function Profile() {
   useEffect(() => {
     let mounted = true;
 
-    if (!id && !authUser) {
+    if (!routeId && !authUser) {
       // wait for auth to resolve before deciding
       return () => { mounted = false; };
     }
 
     // If no id param, try to show current user's profile
-    const targetId = id || (authUser && (authUser.id || authUser._id));
+    const targetId = routeId || (authUser && (authUser.id || authUser._id));
     if (!targetId) {
       // Not signed in and no id: redirect to signin
       setLoading(false);
@@ -54,14 +55,14 @@ function Profile() {
       .catch(() => {});
 
     return () => { mounted = false; };
-  }, [id, authUser, navigate]);
+  }, [routeId, authUser, navigate]);
 
   const handleSubscribe = () => {
-    const targetId = id || (user && (user._id || user.id));
+    const targetId = routeId || (user && (user._id || user.id));
     userAPI.subscribe(targetId).then(() => setSubscribed(true)).catch(() => {});
   };
   const handleUnsubscribe = () => {
-    const targetId = id || (user && (user._id || user.id));
+    const targetId = routeId || (user && (user._id || user.id));
     userAPI.unsubscribe(targetId).then(() => setSubscribed(false)).catch(() => {});
   };
 

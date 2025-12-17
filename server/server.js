@@ -75,6 +75,15 @@ app.get('/api/debug-db', async (req, res) => {
   }
 });
 
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('❌ Global Error:', err);
+  if (err.name === 'MulterError') {
+    return res.status(400).json({ message: err.message, code: err.code });
+  }
+  res.status(500).json({ message: err.message || 'Internal Server Error' });
+});
+
 // Start Server
 const PORT = process.env.PORT || 5002; // Changed default to 5002
 

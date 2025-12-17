@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { mediaAPI, commentAPI, userAPI } from '../services/api';
+import { mediaAPI, commentAPI, userAPI, dailymotionAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   Box,
@@ -41,26 +41,58 @@ function PlayMedia() {
   useEffect(() => {
     setLoading(true);
     setError('');
-    mediaAPI.getMediaById(id)
-      .then(res => {
+    
+    const fetchVideo = async () => {
+      try {
+        // Try backend first
+        const res = await mediaAPI.getMediaById(id);
         const m = res.media || res;
         setMedia(m);
-        setLiked(!!m?.liked); // backend may set liked flag
-        setLoading(false);
+        setLiked(!!m?.liked);
         if (isAuthenticated) {
           userAPI.addToWatchHistory(id).catch(() => {});
         }
-      })
-      .catch(err => {
-        setError(err.message || 'Failed to load video');
+        
+        // Fetch related data only if local video found
+        mediaAPI.getRecommendations(id)
+          .then(res => setRecommendations(res.recommendations || res.media || res || []))
+          .catch(() => setRecommendations([]));
+        commentAPI.getComments(id)
+          .then(res => setComments(res.comments || res || []))
+          .catch(() => setComments([]));
+
+      } catch (err) {
+        // If backend fails, try Dailymotion
+        console.log('Local fetch failed, trying Dailymotion...', err);
+        try {
+          const dmVideo = await dailymotionAPI.getVideoById(id);
+          setMedia({
+            _id: dmVideo.id,
+            title: dmVideo.title,
+            description: dmVideo.description,
+            filePath: dmVideo.url, // ReactPlayer handles DM URLs
+            views: dmVideo.views_total,
+            likes: 0,
+            uploader: {
+              _id: 'dm',
+              name: dmVideo['channel.name'] || 'Dailymotion',
+              avatar: null
+            },
+            created: new Date(dmVideo.created_time * 1000),
+            isDailymotion: true
+          });
+          // Clear error if DM succeeds
+          setError('');
+        } catch (dmErr) {
+          console.error('DM fetch failed:', dmErr);
+          setError('Failed to load video');
+        }
+      } finally {
         setLoading(false);
-      });
-    mediaAPI.getRecommendations(id)
-      .then(res => setRecommendations(res.recommendations || res.media || res || []))
-      .catch(() => setRecommendations([]));
-    commentAPI.getComments(id)
-      .then(res => setComments(res.comments || res || []))
-      .catch(() => setComments([]));
+      }
+    };
+
+    fetchVideo();
   }, [id, isAuthenticated]);
 
   const videoSrc = useMemo(() => {

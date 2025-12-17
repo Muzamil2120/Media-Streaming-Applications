@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Card, CardActionArea, CardContent, CardMedia, Chip, Grid, Stack, Tab, Tabs, Typography } from '@mui/material';
-import { mediaAPI, dailymotionAPI } from '../services/api';
+import { mediaAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:5002';
-const categories = ['All', 'Music', 'Education', 'Gaming', 'Sports', 'Tech', 'News', 'Entertainment', 'Vlogs', 'Other', 'Dailymotion'];
+const categories = ['All', 'Music', 'Education', 'Gaming', 'Sports', 'Tech', 'News', 'Entertainment', 'Vlogs', 'Other'];
 
 const ExplorePage = () => {
   const navigate = useNavigate();
@@ -18,23 +18,7 @@ const ExplorePage = () => {
     try {
       setLoading(true);
       setError('');
-      if (category === 'Dailymotion') {
-        const list = await dailymotionAPI.getTrending(1, 24);
-        const mapped = list.map((v) => ({
-          _id: `dm_${v.id}`,
-          dmId: v.id,
-          title: v.title,
-          description: v.description || v['channel.name'] || '',
-          thumbnail: v.thumbnail_url,
-          views: v.views_total,
-          duration: v.duration,
-          externalUrl: v.url,
-          isExternal: true,
-          category: 'Dailymotion'
-        }));
-        setVideos(mapped);
-        if (mapped.length === 0) setError('No videos returned from Dailymotion.');
-      } else if (category === 'All') {
+      if (category === 'All') {
         const res = await mediaAPI.getAllMedia(1, 30);
         setVideos(res.media || []);
       } else {

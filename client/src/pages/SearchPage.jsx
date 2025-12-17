@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import VideoCard from '../components/VideoCard';
-import { mediaAPI } from '../services/api';
+import { mediaAPI, dailymotionAPI } from '../services/api';
+import { formatDuration } from '../utils/formatters';
 
 const SearchPage = () => {
   const location = useLocation();
@@ -20,15 +21,41 @@ const SearchPage = () => {
     }
     setLoading(true);
     setError('');
-    mediaAPI.searchMedia(query)
-      .then(res => {
-        setResults(res.media || []);
-        setLoading(false);
-      })
-      .catch(err => {
-        setError(err.message || 'Search failed');
-        setLoading(false);
-      });
+    
+    Promise.all([
+      mediaAPI.searchMedia(query).catch(() => ({ media: [] })),
+      dailymotionAPI.search(query).catch(() => [])
+    ]).then(([localRes, dmRes]) => {
+      const localVideos = (localRes.media || []).map(v => ({
+        ...v,
+        thumbnail: v.thumbnail || v.thumbnailUrl // Ensure thumbnail property exists
+      }));
+
+      const dmVideos = dmRes.map(video => ({
+        _id: video.id,
+        title: video.title,
+        description: video.description,
+        thumbnail: video.thumbnail_url,
+        thumbnailUrl: video.thumbnail_url,
+        views: video.views_total,
+        duration: formatDuration(video.duration),
+        uploader: {
+          _id: 'dailymotion',
+          username: video['channel.name'] || 'Dailymotion',
+          avatar: null
+        },
+        created: new Date(),
+        isDailymotion: true,
+        filePath: video.url
+      }));
+      
+      setResults([...localVideos, ...dmVideos]);
+      setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      setError('Search failed');
+      setLoading(false);
+    });
   }, [query]);
 
   return (

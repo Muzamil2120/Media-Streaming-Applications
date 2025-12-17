@@ -20,7 +20,8 @@ import LoadingSpinner from '../components/LoadingSpinner';
 const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:5002';
 
 const ChannelPage = () => {
-  const { id: paramId } = useParams();
+  const { id: rawParamId } = useParams();
+  const paramId = rawParamId && rawParamId !== 'undefined' ? rawParamId : undefined;
   const navigate = useNavigate();
   const { user } = useAuth();
   const [channel, setChannel] = useState(null);

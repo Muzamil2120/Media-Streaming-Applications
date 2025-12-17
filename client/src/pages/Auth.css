@@ -79,6 +79,17 @@
   border: 1px solid #f5c6cb;
 }
 
+.info-message {
+  background: #e0f2fe;
+  color: #0f172a;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #bfdbfe;
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
 .auth-link {
   text-align: center;
   margin-top: 20px;

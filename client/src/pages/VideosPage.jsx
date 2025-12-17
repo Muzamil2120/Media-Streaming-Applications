@@ -1,2 +1,5 @@
-import MediaList from './MediaList';
-export default MediaList;
+import Home from './Home';
+
+export default function VideosPage() {
+	return <Home initialNav="shorts" />;
+}

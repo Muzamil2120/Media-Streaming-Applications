@@ -260,9 +260,11 @@ export const userAPI = {
     }),
 
   getUserUploads: (userId, page = 1, limit = 12) =>
-    apiCall(`/api/users/${userId}/uploads?page=${page}&limit=${limit}`, {
-      method: 'GET',
-    }),
+    userId
+      ? apiCall(`/api/users/${userId}/uploads?page=${page}&limit=${limit}`, {
+          method: 'GET',
+        })
+      : Promise.reject(new Error('Invalid user ID')), 
 
   subscribe: (userId) =>
     apiCall(`/api/users/${userId}/subscribe`, {
@@ -356,5 +358,12 @@ export const dailymotionAPI = {
     // Keep only reasonably short clips (<= 120s) for reel-like layout
     const list = data.list || [];
     return list.filter(item => (item.duration || 0) <= 120);
+  },
+
+  getVideoById: async (id) => {
+    const url = `${DM_BASE_URL}/video/${id}?fields=id,title,description,thumbnail_url,views_total,duration,url,channel.name,created_time`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to load Dailymotion video');
+    return await res.json();
   }
 };
