@@ -82,6 +82,10 @@ const Sidebar = ({ open }) => {
     navigate(path);
   };
 
+  const handleComingSoon = (label) => {
+    window.alert(`${label} coming soon.`);
+  };
+
   return (
     <>
       <aside className={`side-nav ${open ? '' : 'collapsed'}`}>
@@ -122,13 +126,13 @@ const Sidebar = ({ open }) => {
           <div className={`side-nav-item ${isActive('/settings') ? 'active' : ''}`} onClick={() => handleNavClick('/settings')}>
             <SettingsIcon className="icon" /> Settings
           </div>
-          <div className="side-nav-item">
+          <div className="side-nav-item" onClick={() => handleComingSoon('Report history')}>
             <FlagIcon className="icon" /> Report history
           </div>
-          <div className="side-nav-item">
+          <div className="side-nav-item" onClick={() => handleComingSoon('Help')}>
             <HelpOutlineIcon className="icon" /> Help
           </div>
-          <div className="side-nav-item">
+          <div className="side-nav-item" onClick={() => handleComingSoon('Send feedback')}>
             <FeedbackIcon className="icon" /> Send feedback
           </div>
         </div>

@@ -78,7 +78,11 @@ function Home({ initialNav = 'home' }) {
           {!loading && !error && videos.length > 0 && (
             <div className="dm-grid">
               {videos.map(video => (
-                <div key={video._id} className="dm-card" onClick={() => navigate(`/media/play/${video._id}`)}>
+                <div
+                  key={video._id}
+                  className="dm-card"
+                  onClick={() => window.open(`/media/play/${video._id}`, '_blank', 'noopener,noreferrer')}
+                >
                   <div className="dm-thumb-wrapper">
                     <img 
                       src={video.thumbnailUrl || 'https://via.placeholder.com/320x180?text=No+Thumbnail'} 

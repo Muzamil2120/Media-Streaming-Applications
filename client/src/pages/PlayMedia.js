@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { mediaAPI, commentAPI, userAPI, dailymotionAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import VideoPlayer from '../components/VideoPlayer';
 import {
   Box,
   Button,
@@ -162,7 +163,7 @@ function PlayMedia() {
         <Grid item xs={12} md={8}>
           <Card sx={{ boxShadow: 3 }}>
             {videoSrc ? (
-              <CardMedia component="video" controls poster={media.thumbnail || undefined} src={videoSrc} sx={{ width: '100%', maxHeight: 520, backgroundColor: '#000' }} />
+              <VideoPlayer url={videoSrc} title={media.title} videoId={media._id} autoPlay />
             ) : (
               <CardMedia component="img" src={media.thumbnail || '/placeholder.jpg'} alt={media.title} sx={{ width: '100%', maxHeight: 520 }} />
             )}

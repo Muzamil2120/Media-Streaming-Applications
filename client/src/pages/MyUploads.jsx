@@ -27,6 +27,10 @@ export default function MyUploads() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const openPlayerInNewTab = (id) => {
+    window.open(`/media/play/${id}`, '_blank', 'noopener,noreferrer');
+  };
+
   useEffect(() => {
     if (loading) return;
     if (!isAuthenticated) {
@@ -83,24 +87,13 @@ export default function MyUploads() {
               : undefined;
             return (
               <Card key={video._id} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <CardActionArea onClick={() => navigate(`/media/play/${video._id}`)}>
-                  {source ? (
-                    <CardMedia
-                      component="video"
-                      src={source}
-                      poster={thumb || undefined}
-                      title={video.title}
-                      controls
-                      sx={{ height: 190, backgroundColor: '#000' }}
-                    />
-                  ) : (
-                    <CardMedia
-                      component="img"
-                      image={thumb || '/placeholder.jpg'}
-                      title={video.title}
-                      sx={{ height: 190, backgroundColor: '#000', objectFit: 'cover' }}
-                    />
-                  )}
+                <CardActionArea onClick={() => openPlayerInNewTab(video._id)}>
+                  <CardMedia
+                    component="img"
+                    image={thumb || '/placeholder.jpg'}
+                    title={video.title}
+                    sx={{ height: 190, backgroundColor: '#000', objectFit: 'cover' }}
+                  />
                 </CardActionArea>
                 <CardContent sx={{ flexGrow: 1 }}>
                   <Stack spacing={1}>
@@ -119,7 +112,7 @@ export default function MyUploads() {
                   </Stack>
                 </CardContent>
                 <Stack direction="row" spacing={1} sx={{ px: 2, pb: 2 }}>
-                  <Button startIcon={<PlayArrowIcon />} variant="outlined" onClick={() => navigate(`/media/play/${video._id}`)}>
+                  <Button startIcon={<PlayArrowIcon />} variant="outlined" onClick={() => openPlayerInNewTab(video._id)}>
                     Play
                   </Button>
                   <IconButton aria-label="edit" onClick={() => navigate(`/media/edit/${video._id}`)}>

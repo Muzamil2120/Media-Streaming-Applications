@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import ReactPlayer from 'react-player/lazy';
+import ReactPlayer from 'react-player';
 import {
   Box,
   IconButton,
@@ -36,7 +36,6 @@ import {
   Report,
   Info,
 } from '@mui/icons-material';
-import { formatDuration } from '../../utils/formatters';
 
 const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
   const [playing, setPlaying] = useState(autoPlay);
@@ -174,6 +173,7 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
       sx={{
         position: 'relative',
         width: '100%',
+        aspectRatio: '16 / 9',
         bgcolor: '#000',
         borderRadius: 2,
         overflow: 'hidden',
