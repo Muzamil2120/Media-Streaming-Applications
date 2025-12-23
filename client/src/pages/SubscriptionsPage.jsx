@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Grid, Typography, Card, CardActionArea, CardContent, CardMedia, Stack, Chip, Box } from '@mui/material';
+import Grid from '@mui/material/Grid';
+import { Typography, Card, CardActionArea, CardContent, CardMedia, Stack, Chip, Box } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import { userAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -42,10 +43,10 @@ const SubscriptionsPage = () => {
             ? (video.thumbnail.startsWith('http') ? video.thumbnail : `${apiBase}${video.thumbnail}`)
             : undefined;
           return (
-            <Grid item xs={12} sm={6} md={4} key={video._id}>
+            <Grid key={video._id} size={{ xs: 12, sm: 6, md: 4 }}>
               <Card>
                 <CardActionArea onClick={() => navigate(`/media/play/${video._id}`)}>
-                  <CardMedia component="img" image={thumb || '/placeholder.jpg'} alt={video.title} sx={{ height: 180, objectFit: 'cover' }} />
+                  <CardMedia component="img" image={thumb || '/placeholder.svg'} alt={video.title} sx={{ height: 180, objectFit: 'cover' }} />
                   <CardContent>
                     <Stack spacing={0.5}>
                       <Typography variant="subtitle1" fontWeight={700} noWrap>{video.title}</Typography>

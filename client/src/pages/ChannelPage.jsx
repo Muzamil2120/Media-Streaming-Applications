@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import Grid from '@mui/material/Grid';
 import {
   Avatar,
   Box,
@@ -9,7 +10,6 @@ import {
   CardContent,
   CardMedia,
   Chip,
-  Grid,
   Stack,
   Typography,
 } from '@mui/material';
@@ -126,12 +126,12 @@ const ChannelPage = () => {
             ? (video.thumbnail.startsWith('http') ? video.thumbnail : `${apiBase}${video.thumbnail}`)
             : undefined;
           return (
-            <Grid item xs={12} sm={6} md={4} key={video._id}>
+            <Grid key={video._id} size={{ xs: 12, sm: 6, md: 4 }}>
               <Card>
                 <CardActionArea onClick={() => navigate(`/media/play/${video._id}`)}>
                   <CardMedia
                     component="img"
-                    image={thumb || '/placeholder.jpg'}
+                    image={thumb || '/placeholder.svg'}
                     alt={video.title}
                     sx={{ height: 180, objectFit: 'cover' }}
                   />

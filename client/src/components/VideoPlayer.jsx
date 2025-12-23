@@ -10,8 +10,6 @@ import {
   Stack,
   Menu,
   MenuItem,
-  Chip,
-  Popover,
 } from '@mui/material';
 import {
   PlayArrow,
@@ -32,13 +30,13 @@ import {
   Share,
   PlaylistAdd,
   MoreVert,
-  Download,
-  Report,
-  Info,
 } from '@mui/icons-material';
 
 const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
-  const [playing, setPlaying] = useState(autoPlay);
+  // Default paused (YouTube-like). Autoplay is supported but handled safely.
+  const [playing, setPlaying] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [formatError, setFormatError] = useState('');
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
   const [played, setPlayed] = useState(0);
@@ -51,12 +49,55 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
   const [speedAnchor, setSpeedAnchor] = useState(null);
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
-  const [qualities] = useState(['Auto', '1080p', '720p', '480p', '360p']);
   const [speedOptions] = useState([0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]);
   
   const playerRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
   const containerRef = useRef(null);
+  const isMountedRef = useRef(true);
+
+  const getFileExtension = (inputUrl) => {
+    if (!inputUrl || typeof inputUrl !== 'string') return '';
+    const cleaned = inputUrl.split('?')[0].split('#')[0];
+    const lastDot = cleaned.lastIndexOf('.');
+    if (lastDot === -1) return '';
+    return cleaned.slice(lastDot + 1).toLowerCase();
+  };
+
+  const isBrowserPlayableExtension = (ext) => {
+    // Keep this conservative: formats widely supported in modern browsers.
+    return ['mp4', 'm4v', 'webm', 'mov', 'ogv', 'ogg'].includes(ext);
+  };
+
+  // Reset state when switching videos
+  useEffect(() => {
+    setLoadError('');
+    setFormatError('');
+    setPlayed(0);
+    setDuration(0);
+    setSeeking(false);
+    setPlaying(false);
+
+    const ext = getFileExtension(url);
+    if (ext && !isBrowserPlayableExtension(ext)) {
+      setFormatError(`This video format (.${ext}) isn't supported by most browsers. Upload MP4 or WebM for reliable playback.`);
+      setPlaying(false);
+    }
+  }, [url, autoPlay]);
+
+  // Safe autoplay: delay slightly and start muted to satisfy browser policies.
+  // This avoids the common browser warning: "The play() request was interrupted by a call to pause()".
+  useEffect(() => {
+    if (!autoPlay) return;
+    if (loadError || formatError) return;
+
+    const timer = setTimeout(() => {
+      setMuted(true);
+      setPlaying(true);
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [autoPlay, url, loadError, formatError]);
 
   // Format time display
   const formatTime = (seconds) => {
@@ -72,7 +113,8 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
   };
 
   const handlePlayPause = () => {
-    setPlaying(!playing);
+    if (!isMountedRef.current) return;
+    setPlaying((prev) => !prev);
   };
 
   const handleVolumeChange = (event, newValue) => {
@@ -90,17 +132,23 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
 
   const handleSeekMouseUp = (event, newValue) => {
     setSeeking(false);
-    playerRef.current.seekTo(newValue / 100);
+    if (playerRef.current && typeof playerRef.current.seekTo === 'function') {
+      playerRef.current.seekTo(newValue / 100);
+    }
   };
 
   const handleProgress = (state) => {
     if (!seeking) {
       setPlayed(state.played);
     }
-  };
 
-  const handleDuration = (duration) => {
-    setDuration(duration);
+    // Some player backends don't emit a clean duration event; derive it safely.
+    if (!duration && playerRef.current && typeof playerRef.current.getDuration === 'function') {
+      const d = playerRef.current.getDuration();
+      if (typeof d === 'number' && Number.isFinite(d) && d > 0) {
+        setDuration(d);
+      }
+    }
   };
 
   const toggleMuted = () => {
@@ -161,11 +209,17 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       clearTimeout(controlsTimeoutRef.current);
+      isMountedRef.current = false;
+      setPlaying(false); // Stop playback on unmount to prevent play() race
     };
   }, []);
+
+  const showNativeFallback = !!loadError;
+  const showFormatError = !!formatError;
 
   return (
     <Box
@@ -194,14 +248,29 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
       <ReactPlayer
         ref={playerRef}
         url={url}
-        playing={playing}
+        playing={playing && !showNativeFallback && !showFormatError}
         volume={volume}
         muted={muted}
         playbackRate={playbackRate}
         width="100%"
         height="100%"
+        stopOnUnmount
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onReady={() => {
+          if (playerRef.current && typeof playerRef.current.getDuration === 'function') {
+            const d = playerRef.current.getDuration();
+            if (typeof d === 'number' && Number.isFinite(d) && d > 0) {
+              setDuration(d);
+            }
+          }
+        }}
+        onError={(e) => {
+          const msg = (e && e.message) ? e.message : 'Failed to load video';
+          setLoadError(msg);
+          setPlaying(false);
+        }}
         onProgress={handleProgress}
-        onDuration={handleDuration}
         onEnded={() => setPlaying(false)}
         config={{
           youtube: {
@@ -211,10 +280,61 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
               rel: 0,
             },
           },
+          file: {
+            attributes: {
+              playsInline: true,
+              preload: 'metadata',
+              crossOrigin: 'anonymous',
+            }
+          }
         }}
       />
 
+      {/* Unsupported format (e.g., mkv) */}
+      {showFormatError && (
+        <Box sx={{ position: 'absolute', inset: 0, p: 2, bgcolor: '#000', display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Typography variant="body2" sx={{ color: '#fff' }}>
+            {title || 'Video'} can\'t be played.
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.75)' }}>
+            {formatError}
+          </Typography>
+          <Box sx={{ flexGrow: 1 }} />
+          <Button
+            variant="outlined"
+            sx={{ alignSelf: 'flex-start', borderColor: 'rgba(255,255,255,0.35)', color: '#fff' }}
+            onClick={() => {
+              try {
+                window.open(url, '_blank', 'noopener,noreferrer');
+              } catch (err) {
+                // no-op
+              }
+            }}
+          >
+            Download / open video
+          </Button>
+        </Box>
+      )}
+
+      {/* Fallback when ReactPlayer can't load local file */}
+      {showNativeFallback && (
+        <Box sx={{ position: 'absolute', inset: 0, p: 2, bgcolor: '#000' }}>
+          <Typography variant="body2" sx={{ color: '#fff', mb: 1 }}>
+            {title || 'Video'} could not be loaded in the custom player.
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', display: 'block', mb: 2 }}>
+            {loadError}
+          </Typography>
+          <video
+            src={url}
+            controls
+            style={{ width: '100%', height: '100%', maxHeight: '100%', background: '#000', borderRadius: 12 }}
+          />
+        </Box>
+      )}
+
       {/* Controls Overlay */}
+      {!showNativeFallback && !showFormatError && (
       <Box
         className="video-controls"
         sx={{
@@ -379,9 +499,10 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
           </Tooltip>
         </Stack>
       </Box>
+      )}
 
       {/* Top Bar Controls */}
-      {showControls && (
+      {showControls && !showNativeFallback && !showFormatError && (
         <Box
           sx={{
             position: 'absolute',
@@ -471,7 +592,7 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
       )}
 
       {/* Play/Pause Overlay */}
-      {!playing && (
+      {!playing && !showNativeFallback && !showFormatError && (
         <Box
           sx={{
             position: 'absolute',

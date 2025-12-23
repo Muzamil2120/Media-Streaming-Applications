@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { mediaAPI, commentAPI, userAPI, dailymotionAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import VideoPlayer from '../components/VideoPlayer';
+import Grid from '@mui/material/Grid';
 import {
   Box,
   Button,
@@ -11,7 +12,6 @@ import {
   CardMedia,
   Chip,
   Divider,
-  Grid,
   IconButton,
   Stack,
   TextField,
@@ -38,6 +38,12 @@ function PlayMedia() {
   const [savingLater, setSavingLater] = useState(false);
   const [savedLater, setSavedLater] = useState(false);
   const { isAuthenticated } = useAuth();
+
+  const descriptionText = useMemo(() => {
+    const raw = media?.description || 'No description provided.';
+    // Convert <br> tags to newlines and render with whitespace preserved
+    return raw.replace(/<br\s*\/?>/gi, '\n');
+  }, [media]);
 
   useEffect(() => {
     setLoading(true);
@@ -86,7 +92,7 @@ function PlayMedia() {
           setError('');
         } catch (dmErr) {
           console.error('DM fetch failed:', dmErr);
-          setError('Failed to load video');
+          setError('Video not found. Please check the video ID and try again.');
         }
       } finally {
         setLoading(false);
@@ -160,12 +166,12 @@ function PlayMedia() {
         </Button>
       </Stack>
       <Grid container spacing={3}>
-        <Grid item xs={12} md={8}>
-          <Card sx={{ boxShadow: 3 }}>
+        <Grid size={{ xs: 12, md: 8 }}>
+          <Card variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
             {videoSrc ? (
-              <VideoPlayer url={videoSrc} title={media.title} videoId={media._id} autoPlay />
+              <VideoPlayer url={videoSrc} title={media.title} videoId={media._id} />
             ) : (
-              <CardMedia component="img" src={media.thumbnail || '/placeholder.jpg'} alt={media.title} sx={{ width: '100%', maxHeight: 520 }} />
+              <CardMedia component="img" src={media.thumbnail || '/placeholder.svg'} alt={media.title} sx={{ width: '100%', maxHeight: 520 }} />
             )}
             <CardContent>
               <Stack spacing={1.5}>
@@ -187,7 +193,18 @@ function PlayMedia() {
                     <Button size="small" onClick={() => navigate(`/profile/${media.uploader._id}`)}>View profile</Button>
                   )}
                 </Stack>
-                <Typography variant="body2" color="text.secondary">{media.description || 'No description provided.'}</Typography>
+                <Box sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 1.5 }}>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
+                    {descriptionText}
+                  </Typography>
+                </Box>
+                {Array.isArray(media.tags) && media.tags.length > 0 && (
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                    {media.tags.map((tag) => (
+                      <Chip key={tag} label={`#${tag}`} size="small" variant="outlined" />
+                    ))}
+                  </Stack>
+                )}
                 <Divider />
                 <Stack component="form" direction={{ xs: 'column', sm: 'row' }} spacing={1} onSubmit={handleComment}>
                   <TextField
@@ -202,7 +219,7 @@ function PlayMedia() {
                 <Stack spacing={1}>
                   {comments.length === 0 && <Typography variant="body2" color="text.secondary">No comments yet.</Typography>}
                   {comments.map((c) => (
-                    <Box key={c._id || c.id} sx={{ p: 1, borderRadius: 1, backgroundColor: '#f7f7f7' }}>
+                    <Box key={c._id || c.id} sx={{ p: 1, borderRadius: 1, bgcolor: 'background.default' }}>
                       <Typography variant="subtitle2">{c.author?.name || c.author?.username || 'User'}</Typography>
                       <Typography variant="body2">{c.text}</Typography>
                     </Box>
@@ -213,7 +230,7 @@ function PlayMedia() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Typography variant="h6" gutterBottom>Recommended</Typography>
           <Stack spacing={1.5}>
             {recommendations.length === 0 && (
@@ -222,9 +239,9 @@ function PlayMedia() {
             {recommendations.map((video) => {
               const recSrc = video.thumbnail
                 ? (video.thumbnail.startsWith('http') ? video.thumbnail : `${apiBase}${video.thumbnail}`)
-                : '/placeholder.jpg';
+                : '/placeholder.svg';
               return (
-                <Card key={video._id} sx={{ display: 'flex', cursor: 'pointer' }} onClick={() => navigate(`/media/play/${video._id}`)}>
+                <Card key={video._id} variant="outlined" sx={{ display: 'flex', cursor: 'pointer' }} onClick={() => navigate(`/media/play/${video._id}`)}>
                   <CardMedia component="img" image={recSrc} alt={video.title} sx={{ width: 140, height: 90, objectFit: 'cover' }} />
                   <CardContent sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="subtitle2" noWrap>{video.title}</Typography>

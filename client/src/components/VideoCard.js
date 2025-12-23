@@ -31,7 +31,7 @@ function VideoCard({ media, onDelete }) {
     if (media.filePath) {
       return media.filePath.startsWith('http') ? media.filePath : `${apiBase}${media.filePath}`;
     }
-    return '/placeholder.jpg';
+    return '/placeholder.svg';
   }, [media]);
 
   return (

@@ -1,5 +1,6 @@
 const express = require('express');
 const Media = require('../models/Media');
+const mongoose = require('mongoose');
 const auth = require('../middleware/auth');
 const upload = require('../middleware/uploadMiddleware');
 const router = express.Router();
@@ -48,6 +49,11 @@ router.get('/my-media', auth, async (req, res) => {
 // Get single media
 router.get('/:id', async (req, res) => {
   try {
+    // Avoid CastError -> 500 when the client requests external IDs (e.g. Dailymotion).
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(404).json({ message: 'Media not found' });
+    }
+
     const media = await Media.findById(req.params.id)
       .populate('uploader', 'name avatar');
 
@@ -61,7 +67,8 @@ router.get('/:id', async (req, res) => {
 
     res.json({ media });
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('Get media error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 

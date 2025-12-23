@@ -1,11 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { mediaAPI, dailymotionAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { formatDuration } from '../utils/formatters';
 import './Home.css';
 
 function Home({ initialNav = 'home' }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -15,7 +17,7 @@ function Home({ initialNav = 'home' }) {
   // Section refs for scrolling
   const topRef = useRef(null);
 
-  const loadVideos = async () => {
+  const loadVideos = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -48,18 +50,22 @@ function Home({ initialNav = 'home' }) {
         duration: typeof video.duration === 'number' ? formatDuration(video.duration) : video.duration
       }));
 
-      setVideos([...normalizedLocal, ...normalizedDM]);
+      const filteredLocal = user?._id
+        ? normalizedLocal.filter((v) => (v?.uploader?._id || v?.uploader?.id) !== user._id)
+        : normalizedLocal;
+
+      setVideos([...filteredLocal, ...normalizedDM]);
     } catch (err) {
       setError(err.message || 'Failed to load videos');
       setVideos([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?._id]);
 
   useEffect(() => {
     loadVideos();
-  }, []);
+  }, [loadVideos]);
 
   return (
     <div className={`home-layout ${sidebarOpen ? '' : 'sidebar-collapsed'}`} ref={topRef}>
@@ -81,11 +87,11 @@ function Home({ initialNav = 'home' }) {
                 <div
                   key={video._id}
                   className="dm-card"
-                  onClick={() => window.open(`/media/play/${video._id}`, '_blank', 'noopener,noreferrer')}
+                  onClick={() => navigate(`/media/play/${video._id}`)}
                 >
                   <div className="dm-thumb-wrapper">
                     <img 
-                      src={video.thumbnailUrl || 'https://via.placeholder.com/320x180?text=No+Thumbnail'} 
+                      src={video.thumbnailUrl || '/placeholder.svg'} 
                       alt={video.title} 
                       className="dm-thumb" 
                     />

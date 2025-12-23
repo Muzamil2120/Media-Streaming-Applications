@@ -23,7 +23,9 @@ const storage = multer.diskStorage({
 
 // File filter: allow video for 'video' field and images for 'thumbnail' field
 const fileFilter = (req, file, cb) => {
-  const videoTypes = ['.mp4', '.avi', '.mov', '.wmv', '.mkv', '.webm'];
+  // Keep formats browser-friendly (no server-side transcoding in this project).
+  // MP4/WebM are the most reliably playable across modern browsers.
+  const videoTypes = ['.mp4', '.m4v', '.webm', '.mov', '.ogv', '.ogg'];
   const imageTypes = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
   const fileExtension = path.extname(file.originalname).toLowerCase();
 
@@ -34,7 +36,7 @@ const fileFilter = (req, file, cb) => {
 
   if (file.fieldname === 'video') {
     if (videoTypes.includes(fileExtension)) return cb(null, true);
-    return cb(new Error('Only video files are allowed'), false);
+    return cb(new Error('Unsupported video format. Please upload MP4 or WebM for best compatibility.'), false);
   }
 
   // Reject any other fields

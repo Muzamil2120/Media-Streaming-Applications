@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Card, CardActionArea, CardContent, CardMedia, Chip, Grid, Stack, Tab, Tabs, Typography } from '@mui/material';
+import Grid from '@mui/material/Grid';
+import { Box, Card, CardActionArea, CardContent, CardMedia, Chip, Stack, Tab, Tabs, Typography } from '@mui/material';
 import { mediaAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -47,7 +48,7 @@ const ExplorePage = () => {
       {loading ? <LoadingSpinner /> : (
         <Grid container spacing={2}>
           {error && (
-            <Grid item xs={12}>
+            <Grid size={12}>
               <Typography color="error" variant="body2">{error}</Typography>
             </Grid>
           )}
@@ -56,10 +57,10 @@ const ExplorePage = () => {
               ? (video.thumbnail.startsWith('http') ? video.thumbnail : `${apiBase}${video.thumbnail}`)
               : undefined;
             return (
-              <Grid item xs={12} sm={6} md={4} key={video._id}>
+              <Grid key={video._id} size={{ xs: 12, sm: 6, md: 4 }}>
                 <Card>
                   <CardActionArea onClick={() => video.isExternal ? window.open(video.externalUrl, '_blank') : navigate(`/media/play/${video._id}`)}>
-                    <CardMedia component="img" image={thumb || '/placeholder.jpg'} alt={video.title} sx={{ height: 170, objectFit: 'cover' }} />
+                    <CardMedia component="img" image={thumb || '/placeholder.svg'} alt={video.title} sx={{ height: 170, objectFit: 'cover' }} />
                     <CardContent>
                       <Stack spacing={0.5}>
                         <Typography variant="subtitle1" fontWeight={700} noWrap>{video.title}</Typography>

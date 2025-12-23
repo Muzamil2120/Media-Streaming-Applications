@@ -134,7 +134,7 @@ const UploadModal = ({ open, onClose }) => {
                 or click to browse files
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                MP4, MOV, AVI, MKV or WebM (Max 100MB)
+                MP4 or WebM (Max 100MB)
               </Typography>
             </Box>
 

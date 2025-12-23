@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Card, CardActionArea, CardContent, CardMedia, Grid, Stack, Typography } from '@mui/material';
+import Grid from '@mui/material/Grid';
+import { Box, Card, CardActionArea, CardContent, CardMedia, Stack, Typography } from '@mui/material';
 import { userAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useAuth } from '../context/AuthContext';
@@ -47,10 +48,10 @@ const HistoryPage = () => {
             ? (video.thumbnail.startsWith('http') ? video.thumbnail : `${apiBase}${video.thumbnail}`)
             : undefined;
           return (
-            <Grid item xs={12} sm={6} md={4} key={video._id}>
+            <Grid key={video._id} size={{ xs: 12, sm: 6, md: 4 }}>
               <Card>
                 <CardActionArea onClick={() => navigate(`/media/play/${video._id}`)}>
-                  <CardMedia component="img" image={thumb || '/placeholder.jpg'} alt={video.title} sx={{ height: 160, objectFit: 'cover' }} />
+                  <CardMedia component="img" image={thumb || '/placeholder.svg'} alt={video.title} sx={{ height: 160, objectFit: 'cover' }} />
                   <CardContent>
                     <Stack spacing={0.5}>
                       <Typography variant="subtitle1" fontWeight={700} noWrap>{video.title}</Typography>
