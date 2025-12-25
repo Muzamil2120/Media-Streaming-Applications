@@ -3,18 +3,132 @@ require('dotenv').config(); // MUST BE FIRST LINE
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const { connectDB, mongoose } = require('./db');
 
 const app = express();
 
 // Middleware
-app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5002'], // Updated to match your backend port
-  credentials: true,
-  optionsSuccessStatus: 200
-}));
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001',
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow non-browser clients (no Origin header)
+      if (!origin) return callback(null, true);
+
+      // Allow explicitly configured origins
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+
+      // Allow custom origin via env (comma-separated)
+      const extra = (process.env.CORS_ORIGINS || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (extra.includes(origin)) return callback(null, true);
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+    optionsSuccessStatus: 200,
+  })
+);
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+
+// Helper: find an uploaded file by name in either supported uploads directory
+const findUploadPath = (filename) => {
+  const candidates = [
+    path.join(__dirname, 'uploads', filename),
+    path.join(__dirname, '../uploads', filename),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+};
+
+// Helper: minimal content-type mapping (keeps dependencies small)
+const contentTypeFor = (filename) => {
+  const ext = path.extname(filename || '').toLowerCase();
+  switch (ext) {
+    case '.mp4':
+    case '.m4v':
+      return 'video/mp4';
+    case '.webm':
+      return 'video/webm';
+    case '.mov':
+      return 'video/quicktime';
+    case '.ogv':
+    case '.ogg':
+      return 'video/ogg';
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.png':
+      return 'image/png';
+    case '.webp':
+      return 'image/webp';
+    case '.gif':
+      return 'image/gif';
+    default:
+      return 'application/octet-stream';
+  }
+};
+
+// Stream uploads with Range support (important for reliable video playback)
+app.get('/uploads/:filename', (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const fullPath = findUploadPath(filename);
+    if (!fullPath) return res.status(404).end('Not found');
+
+    const stat = fs.statSync(fullPath);
+    const fileSize = stat.size;
+    const range = req.headers.range;
+    const contentType = contentTypeFor(filename);
+
+    // Always advertise that we support ranges
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Content-Type', contentType);
+
+    if (!range) {
+      res.setHeader('Content-Length', fileSize);
+      fs.createReadStream(fullPath).pipe(res);
+      return;
+    }
+
+    // Example: "bytes=0-1023"
+    const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+    if (!match) {
+      res.status(416).setHeader('Content-Range', `bytes */${fileSize}`).end();
+      return;
+    }
+
+    const start = match[1] ? parseInt(match[1], 10) : 0;
+    const end = match[2] ? parseInt(match[2], 10) : Math.min(start + 1024 * 1024 - 1, fileSize - 1);
+
+    if (Number.isNaN(start) || Number.isNaN(end) || start >= fileSize || end >= fileSize || start > end) {
+      res.status(416).setHeader('Content-Range', `bytes */${fileSize}`).end();
+      return;
+    }
+
+    const chunkSize = end - start + 1;
+    res.status(206);
+    res.setHeader('Content-Length', chunkSize);
+    res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+    fs.createReadStream(fullPath, { start, end }).pipe(res);
+  } catch (err) {
+    console.error('❌ Upload stream error:', err);
+    res.status(500).end('Server error');
+  }
+});
+
 // Serve uploaded media. Historically, uploads may exist in either:
 // - server/uploads (current)
 // - <repoRoot>/uploads (legacy)

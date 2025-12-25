@@ -6,13 +6,16 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "transcode:existing": "node tools/transcodeExistingUploads.js",
+    "cleanup:missing": "node tools/cleanupMissingFiles.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.22.1",
+    "ffmpeg-static": "^5.3.0",
     "formidable": "^1.2.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^7.8.8",

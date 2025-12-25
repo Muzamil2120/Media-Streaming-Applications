@@ -76,31 +76,55 @@ function Profile() {
 
   return (
     <div className="profile-page">
+      {/* Banner Section */}
+      <div className="profile-banner" />
+      
+      {/* Profile Header */}
       <div className="profile-header">
         <img className="profile-avatar" src={user.avatar || '/default-avatar.jpg'} alt={displayName} />
         <div className="profile-info">
           <h2>{displayName} {user.verified && <span className="verified-badge">✓</span>}</h2>
           <div className="profile-meta">
-            <span>{subscriberCount} subscribers</span>
-            {subscribed ? (
-              <button className="unsubscribe-btn" onClick={handleUnsubscribe}>Unsubscribe</button>
+            <span>📊 {subscriberCount} subscribers</span>
+            {isOwner ? (
+              <a href="/edit-profile" className="edit-profile-btn">Edit Channel</a>
+            ) : subscribed ? (
+              <button className="unsubscribe-btn" onClick={handleUnsubscribe}>✓ Subscribed</button>
             ) : (
               <button className="subscribe-btn" onClick={handleSubscribe}>Subscribe</button>
             )}
           </div>
-          <div className="profile-bio">{user.bio}</div>
+          <div className="profile-bio">{user.bio || 'Welcome to my channel!'}</div>
         </div>
       </div>
-      <h3 className="profile-section-title">Uploads</h3>
-      {user.isPrivate && !isOwner ? (
-        <div className="private-account-note">This account is private. Uploads are hidden.</div>
-      ) : (
-        <div className="profile-uploads-grid">
-          {uploads.map(video => (
-            <VideoCard key={video._id} media={video} />
-          ))}
-        </div>
-      )}
+
+      {/* Tabs */}
+      <div className="profile-tabs">
+        <button className="profile-tab active">Videos</button>
+        <button className="profile-tab">Playlists</button>
+        <button className="profile-tab">About</button>
+      </div>
+
+      {/* Content */}
+      <div className="profile-content">
+        <h3 className="profile-section-title">Videos</h3>
+        {uploads.length === 0 ? (
+          <div className="no-videos">
+            <p>No videos yet</p>
+            {isOwner && (
+              <a href="/upload" className="upload-link">Upload your first video</a>
+            )}
+          </div>
+        ) : user.isPrivate && !isOwner ? (
+          <div className="private-account-note">This account is private. Videos are hidden.</div>
+        ) : (
+          <div className="profile-uploads-grid">
+            {uploads.map(video => (
+              <VideoCard key={video._id} media={video} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

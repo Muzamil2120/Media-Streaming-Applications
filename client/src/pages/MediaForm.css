@@ -1,147 +1,93 @@
-/* Minimal styles for upload form */
-.media-form-container { max-width: 800px; margin: 24px auto; padding: 16px; }
-.media-form label { display: block; margin-top: 12px; font-weight: 600; }
-.media-form input[type="text"], .media-form input[type="file"], .media-form textarea, .media-form select, .media-form input { width: 100%; padding: 8px; margin-top: 6px; box-sizing: border-box; }
-.media-form textarea { resize: vertical; }
-.form-actions { margin-top: 16px; }
-.form-actions button { padding: 8px 16px; }
-.form-error { color: #a94442; background: #f2dede; padding: 8px; border-radius: 4px; }
-.form-success { color: #3c763d; background: #dff0d8; padding: 8px; border-radius: 4px; }
-.thumb-preview img { margin-top: 8px; border-radius: 6px; }
-.progress-bar { background: #eee; height: 10px; border-radius: 6px; margin-top: 12px; overflow: hidden; }
-.progress { background: #4caf50; height: 100%; transition: width 0.2s; }
+/* Shared form styles for EditMedia (and any media form pages). */
+
 .media-form-container {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 40px 20px;
-  min-height: calc(100vh - 70px);
+  padding: 24px 16px;
 }
 
 .form-header {
-  text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 16px;
 }
 
 .form-header h1 {
-  color: #333;
-  font-size: 2.5rem;
-  margin-bottom: 10px;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
 }
 
 .form-header p {
-  color: #666;
-  font-size: 1.1rem;
+  margin: 8px 0 0;
+  opacity: 0.8;
 }
 
 .media-form {
-  background: white;
-  padding: 40px;
   border-radius: 12px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  padding: 16px;
 }
 
 .form-group {
-  margin-bottom: 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 
 .form-group label {
-  display: block;
-  margin-bottom: 8px;
-  color: #333;
+  font-size: 14px;
   font-weight: 600;
+  opacity: 0.9;
 }
 
 .form-group input,
 .form-group textarea,
 .form-group select {
   width: 100%;
-  padding: 12px 16px;
-  border: 2px solid #e1e5e9;
-  border-radius: 6px;
-  font-size: 1rem;
-  transition: border-color 0.3s ease;
+  border-radius: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  outline: none;
+}
+
+.form-group textarea {
+  resize: vertical;
 }
 
 .form-group input:focus,
 .form-group textarea:focus,
 .form-group select:focus {
-  outline: none;
-  border-color: #667eea;
-}
-
-.file-upload {
-  position: relative;
-}
-
-.file-upload input[type="file"] {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.file-info {
-  padding: 12px 16px;
-  border: 2px dashed #667eea;
-  border-radius: 6px;
-  background: #f8f9ff;
-  color: #667eea;
-  text-align: center;
-  transition: background 0.3s ease;
-}
-
-.file-upload:hover .file-info {
-  background: #eef1ff;
+  border-color: rgba(102, 126, 234, 0.6);
 }
 
 .form-actions {
   display: flex;
-  gap: 15px;
   justify-content: flex-end;
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px solid #e1e5e9;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.cancel-btn,
+.submit-btn {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .cancel-btn {
-  padding: 12px 24px;
-  background: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: background 0.3s ease;
-}
-
-.cancel-btn:hover {
-  background: #5a6268;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
 }
 
 .submit-btn {
-  padding: 12px 24px;
-  background: #667eea;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: background 0.3s ease;
-}
-
-.submit-btn:hover:not(:disabled) {
-  background: #5a6fd8;
-}
-
-.submit-btn:disabled {
-  background: #a0a0a0;
-  cursor: not-allowed;
+  background: rgba(102, 126, 234, 0.9);
+  color: #fff;
 }
 
 .loading {
-  text-align: center;
-  padding: 60px 20px;
-  font-size: 1.2rem;
-  color: #666;
+  padding: 24px 16px;
+  opacity: 0.8;
 }

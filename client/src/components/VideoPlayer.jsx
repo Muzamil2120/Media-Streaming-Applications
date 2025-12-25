@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import ReactPlayer from 'react-player';
+import ErrorBoundary from './ErrorBoundary';
 import {
   Box,
   IconButton,
@@ -52,9 +53,44 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
   const [speedOptions] = useState([0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]);
   
   const playerRef = useRef(null);
+  const nativeVideoRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
   const containerRef = useRef(null);
   const isMountedRef = useRef(true);
+
+  const isLocalUploadedFile = useMemo(() => {
+    if (!url || typeof url !== 'string') return false;
+    const lowered = url.toLowerCase();
+    const isFileExt = /\.(mp4|m4v|webm|mov|ogv|ogg)(\?|#|$)/i.test(lowered);
+    const isUploadsPath = lowered.includes('/uploads/');
+    const isHttpLocalhost = lowered.startsWith('http://localhost') || lowered.startsWith('http://127.0.0.1');
+    const isRelativeUploads = lowered.startsWith('/uploads/');
+    return isFileExt && isUploadsPath && (isHttpLocalhost || isRelativeUploads);
+  }, [url]);
+
+  // If the server file is missing (404), show a clear message.
+  useEffect(() => {
+    if (!isLocalUploadedFile || !url) return;
+
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(url, { method: 'HEAD', signal: controller.signal });
+        if (!res.ok) {
+          if (res.status === 404) {
+            setLoadError('Video file is missing on the server (404). Please delete and re-upload this video.');
+          } else {
+            setLoadError(`Video file could not be loaded (HTTP ${res.status}).`);
+          }
+          setPlaying(false);
+        }
+      } catch (e) {
+        // If HEAD fails (e.g., older servers), let the video element handle it.
+      }
+    })();
+
+    return () => controller.abort();
+  }, [isLocalUploadedFile, url]);
 
   const getFileExtension = (inputUrl) => {
     if (!inputUrl || typeof inputUrl !== 'string') return '';
@@ -69,8 +105,9 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
     return ['mp4', 'm4v', 'webm', 'mov', 'ogv', 'ogg'].includes(ext);
   };
 
-  // Reset state when switching videos
+  // Reset state when switching videos and initialize mounted flag
   useEffect(() => {
+    isMountedRef.current = true;
     setLoadError('');
     setFormatError('');
     setPlayed(0);
@@ -78,11 +115,34 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
     setSeeking(false);
     setPlaying(false);
 
+    const currentPlayer = playerRef.current;
+
     const ext = getFileExtension(url);
     if (ext && !isBrowserPlayableExtension(ext)) {
       setFormatError(`This video format (.${ext}) isn't supported by most browsers. Upload MP4 or WebM for reliable playback.`);
       setPlaying(false);
     }
+
+    return () => {
+      // Ensure player stops on unmount
+      if (currentPlayer && typeof currentPlayer.seekTo === 'function') {
+        try {
+          currentPlayer.seekTo(0);
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // Stop native video too
+      if (nativeVideoRef.current) {
+        try {
+          nativeVideoRef.current.pause();
+        } catch (e) {
+          // ignore
+        }
+      }
+      isMountedRef.current = false;
+    };
   }, [url, autoPlay]);
 
   // Safe autoplay: delay slightly and start muted to satisfy browser policies.
@@ -90,10 +150,13 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
   useEffect(() => {
     if (!autoPlay) return;
     if (loadError || formatError) return;
+    if (!isMountedRef.current) return;
 
     const timer = setTimeout(() => {
-      setMuted(true);
-      setPlaying(true);
+      if (isMountedRef.current) {
+        setMuted(true);
+        setPlaying(true);
+      }
     }, 200);
 
     return () => clearTimeout(timer);
@@ -245,50 +308,100 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
       }}
     >
       {/* Video Player */}
-      <ReactPlayer
-        ref={playerRef}
-        url={url}
-        playing={playing && !showNativeFallback && !showFormatError}
-        volume={volume}
-        muted={muted}
-        playbackRate={playbackRate}
-        width="100%"
-        height="100%"
-        stopOnUnmount
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onReady={() => {
-          if (playerRef.current && typeof playerRef.current.getDuration === 'function') {
-            const d = playerRef.current.getDuration();
+      {isLocalUploadedFile ? (
+        <video
+          ref={nativeVideoRef}
+          src={url}
+          controls
+          playsInline
+          preload="metadata"
+          style={{ width: '100%', height: '100%', background: '#000' }}
+          onLoadedMetadata={(e) => {
+            const d = e.currentTarget?.duration;
             if (typeof d === 'number' && Number.isFinite(d) && d > 0) {
               setDuration(d);
             }
-          }
-        }}
-        onError={(e) => {
-          const msg = (e && e.message) ? e.message : 'Failed to load video';
-          setLoadError(msg);
-          setPlaying(false);
-        }}
-        onProgress={handleProgress}
-        onEnded={() => setPlaying(false)}
-        config={{
-          youtube: {
-            playerVars: {
-              controls: 0,
-              modestbranding: 1,
-              rel: 0,
-            },
-          },
-          file: {
-            attributes: {
-              playsInline: true,
-              preload: 'metadata',
-              crossOrigin: 'anonymous',
+          }}
+          onTimeUpdate={(e) => {
+            const el = e.currentTarget;
+            if (!el || !duration) return;
+            const p = el.currentTime / duration;
+            if (Number.isFinite(p)) setPlayed(Math.max(0, Math.min(1, p)));
+          }}
+          onPlay={() => {
+            if (isMountedRef.current) setPlaying(true);
+          }}
+          onPause={() => {
+            if (isMountedRef.current) setPlaying(false);
+          }}
+          onError={() => {
+            if (isMountedRef.current) {
+              setLoadError('Failed to load video in the browser. If this is an MP4, it may use an unsupported codec—try converting to H.264/AAC.');
+              setPlaying(false);
             }
-          }
-        }}
-      />
+          }}
+        />
+      ) : (
+        <ReactPlayer
+          ref={playerRef}
+          url={url}
+          playing={playing && !showNativeFallback && !showFormatError && isMountedRef.current}
+          volume={volume}
+          muted={muted}
+          playbackRate={playbackRate}
+          width="100%"
+          height="100%"
+          stopOnUnmount
+          progressInterval={500}
+          onPlay={() => {
+            if (isMountedRef.current) setPlaying(true);
+          }}
+          onPause={() => {
+            if (isMountedRef.current) setPlaying(false);
+          }}
+          onReady={() => {
+            if (isMountedRef.current && playerRef.current && typeof playerRef.current.getDuration === 'function') {
+              const d = playerRef.current.getDuration();
+              if (typeof d === 'number' && Number.isFinite(d) && d > 0) {
+                setDuration(d);
+              }
+            }
+          }}
+          onDuration={(d) => {
+            if (isMountedRef.current && typeof d === 'number' && Number.isFinite(d) && d > 0) {
+              setDuration(d);
+            }
+          }}
+          onError={(e) => {
+            if (isMountedRef.current) {
+              const msg = (e && e.message)
+                ? e.message
+                : 'Failed to load video. If this is an MP4, it may use an unsupported codec—try H.264/AAC or WebM.';
+              setLoadError(msg);
+              setPlaying(false);
+            }
+          }}
+          onProgress={handleProgress}
+          onEnded={() => {
+            if (isMountedRef.current) setPlaying(false);
+          }}
+          config={{
+            youtube: {
+              playerVars: {
+                controls: 0,
+                modestbranding: 1,
+                rel: 0,
+              },
+            },
+            file: {
+              attributes: {
+                playsInline: true,
+                preload: 'metadata',
+              }
+            }
+          }}
+        />
+      )}
 
       {/* Unsupported format (e.g., mkv) */}
       {showFormatError && (
@@ -628,4 +741,10 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
   );
 };
 
-export default VideoPlayer;
+const VideoPlayerWithBoundary = (props) => (
+  <ErrorBoundary>
+    <VideoPlayer {...props} />
+  </ErrorBoundary>
+);
+
+export default VideoPlayerWithBoundary;

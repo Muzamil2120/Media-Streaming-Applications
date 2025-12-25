@@ -1,9 +1,156 @@
 const express = require('express');
 const Media = require('../models/Media');
 const mongoose = require('mongoose');
+const path = require('path');
+const fs = require('fs');
+const { spawn } = require('child_process');
 const auth = require('../middleware/auth');
 const upload = require('../middleware/uploadMiddleware');
 const router = express.Router();
+
+let ffmpegPath = null;
+try {
+  // Optional dependency; if missing, uploads still work but may not be browser-playable
+  // for some phone codecs (e.g., HEVC).
+  // eslint-disable-next-line global-require
+  ffmpegPath = require('ffmpeg-static');
+} catch (e) {
+  ffmpegPath = null;
+}
+
+const transcodeToH264Faststart = (inputPath, outputPath) => {
+  return new Promise((resolve, reject) => {
+    if (!ffmpegPath) {
+      return reject(new Error('ffmpeg is not available (ffmpeg-static not installed)'));
+    }
+
+    const preset = process.env.TRANSCODE_PRESET || 'ultrafast';
+    const crf = process.env.TRANSCODE_CRF || '28';
+    const audioBitrate = process.env.TRANSCODE_AUDIO_BITRATE || '128k';
+
+    const args = [
+      '-y',
+      '-i', inputPath,
+      // Map video and (optional) audio
+      '-map', '0:v:0',
+      '-map', '0:a?',
+      // Video: H.264
+      '-c:v', 'libx264',
+      '-preset', preset,
+      '-crf', String(crf),
+      // Audio: AAC (only if present)
+      '-c:a', 'aac',
+      '-b:a', String(audioBitrate),
+      // Place moov atom at the start for fast metadata loading
+      '-movflags', '+faststart',
+      outputPath,
+    ];
+
+    // IMPORTANT: don't pipe stdout unless you fully drain it; otherwise ffmpeg can deadlock.
+    const child = spawn(ffmpegPath, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    let stderr = '';
+
+    const timeoutMs = Number.parseInt(process.env.TRANSCODE_TIMEOUT_MS || '1800000', 10); // 30 min default
+    const disableTimeout = String(process.env.TRANSCODE_DISABLE_TIMEOUT || '').toLowerCase() === 'true';
+    const timeout = disableTimeout
+      ? null
+      : setTimeout(() => {
+          try {
+            child.kill('SIGKILL');
+          } catch {
+            // ignore
+          }
+          reject(new Error(`ffmpeg timed out after ${timeoutMs}ms. args=${JSON.stringify(args)}`));
+        }, Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 1800000);
+
+    child.stderr.on('data', (d) => {
+      stderr += d.toString();
+    });
+
+    child.on('error', (err) => {
+      if (timeout) clearTimeout(timeout);
+      reject(err);
+    });
+    child.on('close', (code) => {
+      if (timeout) clearTimeout(timeout);
+      if (code === 0) return resolve();
+      reject(new Error(`ffmpeg failed (code ${code}). ${stderr.slice(-2000)}`));
+    });
+  });
+};
+
+const remuxFaststart = (inputPath, outputPath) => {
+  return new Promise((resolve, reject) => {
+    if (!ffmpegPath) {
+      return reject(new Error('ffmpeg is not available (ffmpeg-static not installed)'));
+    }
+
+    const args = [
+      '-y',
+      '-i', inputPath,
+      '-c', 'copy',
+      '-movflags', '+faststart',
+      outputPath,
+    ];
+
+    const child = spawn(ffmpegPath, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    let stderr = '';
+
+    const timeoutMs = Number.parseInt(process.env.TRANSCODE_TIMEOUT_MS || '1800000', 10);
+    const disableTimeout = String(process.env.TRANSCODE_DISABLE_TIMEOUT || '').toLowerCase() === 'true';
+    const timeout = disableTimeout
+      ? null
+      : setTimeout(() => {
+          try { child.kill('SIGKILL'); } catch { /* ignore */ }
+          reject(new Error(`ffmpeg (faststart) timed out after ${timeoutMs}ms. args=${JSON.stringify(args)}`));
+        }, Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 1800000);
+
+    child.stderr.on('data', (d) => {
+      stderr += d.toString();
+    });
+
+    child.on('error', (err) => {
+      if (timeout) clearTimeout(timeout);
+      reject(err);
+    });
+
+    child.on('close', (code) => {
+      if (timeout) clearTimeout(timeout);
+      if (code === 0) return resolve();
+      reject(new Error(`ffmpeg (faststart) failed (code ${code}). ${stderr.slice(-2000)}`));
+    });
+  });
+};
+
+// Quick probe using ffmpeg itself (no ffprobe dependency).
+// ffmpeg prints codec info then exits with non-zero because no output is specified.
+const probeMediaInfo = (inputPath) => {
+  return new Promise((resolve, reject) => {
+    if (!ffmpegPath) return resolve('');
+    const child = spawn(ffmpegPath, ['-hide_banner', '-i', inputPath], { stdio: ['ignore', 'ignore', 'pipe'] });
+    let stderr = '';
+    child.stderr.on('data', (d) => {
+      stderr += d.toString();
+    });
+    child.on('error', reject);
+    child.on('close', () => resolve(stderr));
+  });
+};
+
+const seemsBrowserPlayable = (probeText, originalNameOrFilename) => {
+  const name = String(originalNameOrFilename || '').toLowerCase();
+  const isMp4ish = name.endsWith('.mp4') || name.endsWith('.m4v') || /\bmp4\b/i.test(probeText);
+  const hasH264 = /Video:\s*h264/i.test(probeText);
+  const hasHevc = /Video:\s*(hevc|h265)/i.test(probeText);
+  const hasAac = /Audio:\s*aac/i.test(probeText);
+  const hasNoAudio = /Stream #\d+:\d+\(.*\): Audio:/i.test(probeText) === false;
+
+  // If HEVC/H.265 detected, treat as not playable for most browsers.
+  if (hasHevc) return false;
+  // MP4 + H.264 is usually fine; audio may be missing or AAC.
+  if (isMp4ish && hasH264 && (hasAac || hasNoAudio)) return true;
+  return false;
+};
 
 
 
@@ -97,13 +244,69 @@ router.post('/upload', requireAuth, upload.fields([{ name: 'video', maxCount: 1 
       return res.status(401).json({ message: 'Authentication required to upload' });
     }
 
+    // Ensure browser-playable output like YouTube (H.264/AAC + faststart).
+    // This improves compatibility for phone-recorded MP4 files (often HEVC).
+    const uploadsDir = path.join(__dirname, '../uploads');
+    const inputPath = path.join(uploadsDir, videoFile.filename);
+    let finalFilename = videoFile.filename;
+    let finalSize = videoFile.size;
+
+    const shouldTranscode = process.env.DISABLE_TRANSCODE !== 'true';
+    // Skip transcoding if it already looks browser-playable (saves a lot of time).
+    let alreadyPlayable = false;
+    if (shouldTranscode && ffmpegPath) {
+      try {
+        const info = await probeMediaInfo(inputPath);
+        alreadyPlayable = seemsBrowserPlayable(info, videoFile.originalname || videoFile.filename);
+      } catch {
+        alreadyPlayable = false;
+      }
+    }
+
+    const isMp4Like = String(videoFile.originalname || videoFile.filename || '').toLowerCase().match(/\.(mp4|m4v)$/);
+
+    if (shouldTranscode && ffmpegPath && alreadyPlayable && isMp4Like) {
+      // Ensure quick start (moov atom first) without re-encoding.
+      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      const outputFilename = `video-${uniqueSuffix}.mp4`;
+      const outputPath = path.join(uploadsDir, outputFilename);
+      try {
+        await remuxFaststart(inputPath, outputPath);
+        finalFilename = outputFilename;
+        finalSize = fs.statSync(outputPath).size;
+        try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
+      } catch (e) {
+        console.warn('⚠️ Faststart remux failed; keeping original upload:', e.message);
+      }
+    } else if (shouldTranscode && ffmpegPath && !alreadyPlayable) {
+      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      const outputFilename = `video-${uniqueSuffix}.mp4`;
+      const outputPath = path.join(uploadsDir, outputFilename);
+
+      try {
+        await transcodeToH264Faststart(inputPath, outputPath);
+        // Prefer the transcoded file for playback
+        finalFilename = outputFilename;
+        finalSize = fs.statSync(outputPath).size;
+        // Remove original to save disk space
+        try {
+          fs.unlinkSync(inputPath);
+        } catch (e) {
+          // ignore
+        }
+      } catch (e) {
+        console.warn('⚠️ Transcode failed; keeping original upload:', e.message);
+        // Keep original file; client may still play if codecs are supported
+      }
+    }
+
     const media = new Media({
       title,
       description,
-      filename: videoFile.filename,
+      filename: finalFilename,
       originalName: videoFile.originalname,
-      filePath: `/uploads/${videoFile.filename}`,
-      fileSize: videoFile.size,
+      filePath: `/uploads/${finalFilename}`,
+      fileSize: finalSize,
       thumbnail: thumbFile ? `/uploads/${thumbFile.filename}` : '',
       category: category || 'Other',
       tags: tags ? tags.split(',').map(tag => tag.trim()) : [],

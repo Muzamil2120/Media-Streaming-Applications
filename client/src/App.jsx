@@ -1,9 +1,10 @@
-import React, { lazy, Suspense, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SnackbarProvider } from 'notistack';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { AuthProvider } from './context/AuthContext';
+import { LikesProvider } from './context/LikesContext';
 import createAppTheme from './theme';
 
 // Layout
@@ -11,13 +12,12 @@ import Layout from './components/layout/Layout';
 import LoadingSpinner from './components/LoadingSpinner';
 
 // Lazy load pages for better performance
-const HomePage = lazy(() => import('./pages/HomePage'));
-const VideosPage = lazy(() => import('./pages/VideosPage'));
+const HomePage = lazy(() => import('./pages/Home'));
 const UploadPage = lazy(() => import('./pages/UploadPage'));
 const EditMedia = lazy(() => import('./pages/EditMedia'));
-const EditProfilePage = lazy(() => import('./pages/EditProfile'));
-const VideoDetailPage = lazy(() => import('./pages/VideoDetailPage'));
-const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const EditProfilePage = lazy(() => import('./pages/EditProfile.jsx'));
+const VideoDetailPage = lazy(() => import('./pages/PlayMedia'));
+const ProfilePage = lazy(() => import('./pages/Profile'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
@@ -50,6 +50,11 @@ const PageLoader = () => (
 function App() {
   const [mode, setMode] = useState(() => localStorage.getItem('themeMode') || 'light');
   const theme = useMemo(() => createAppTheme(mode), [mode]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', mode);
+  }, [mode]);
+
   const toggleTheme = () => {
     setMode((prev) => {
       const next = prev === 'light' ? 'dark' : 'light';
@@ -63,9 +68,10 @@ function App() {
       <AuthProvider>
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <SnackbarProvider maxSnack={3}>
-            <Router>
-              <Routes>
+          <LikesProvider>
+            <SnackbarProvider maxSnack={3}>
+              <Router>
+                <Routes>
               {/* Auth Routes (support signin/signup paths used in Navbar) */}
               <Route path="/signin" element={
                 <Suspense fallback={<PageLoader />}>
@@ -87,7 +93,7 @@ function App() {
                 } />
                 <Route path="videos" element={
                   <Suspense fallback={<PageLoader />}>
-                    <VideosPage />
+                    <HomePage />
                   </Suspense>
                 } />
                 <Route path="upload" element={
@@ -98,7 +104,7 @@ function App() {
                 {/* Support legacy and navbar routes for media and profile */}
                 <Route path="media" element={
                   <Suspense fallback={<PageLoader />}>
-                    <VideosPage />
+                    <HomePage />
                   </Suspense>
                 } />
                 <Route path="media/play/:id" element={
@@ -212,9 +218,10 @@ function App() {
                   </Suspense>
                 } />
               </Route>
-              </Routes>
-            </Router>
-          </SnackbarProvider>
+                </Routes>
+              </Router>
+            </SnackbarProvider>
+          </LikesProvider>
         </ThemeProvider>
       </AuthProvider>
     </QueryClientProvider>

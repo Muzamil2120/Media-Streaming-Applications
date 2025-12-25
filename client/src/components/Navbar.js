@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { userAPI } from '../services/api';
+import Logo from './Logo';
 import './Navbar.css';
 
 // Icons
@@ -20,6 +21,9 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import FeedbackIcon from '@mui/icons-material/Feedback';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import HistoryIcon from '@mui/icons-material/History';
+import CloseIcon from '@mui/icons-material/Close';
+import SendIcon from '@mui/icons-material/Send';
 
 const getAvatar = (u) => {
   if (u && u.avatar) return u.avatar;
@@ -39,6 +43,10 @@ function Navbar({ onToggleTheme, themeMode, onToggleSidebar }) {
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [listening, setListening] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
   const dropdownRef = useRef(null);
   const recognitionRef = useRef(null);
 
@@ -95,13 +103,15 @@ function Navbar({ onToggleTheme, themeMode, onToggleSidebar }) {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [dropdownRef]);
 
-  useEffect(() => () => {
-    if (recognitionRef.current && recognitionRef.current.stop) {
-      recognitionRef.current.stop();
-    }
-  }, []);
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current && recognitionRef.current.stop) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [recognitionRef]);
 
   // Fetch users when modal opens
   useEffect(() => {
@@ -137,8 +147,8 @@ function Navbar({ onToggleTheme, themeMode, onToggleSidebar }) {
           <MenuIcon />
         </button>
         <Link to="/" className="nav-logo">
-          <div className="logo-icon">▶</div>
-          <span>YouTube Clone</span>
+          <Logo />
+          <span>Media Streaming</span>
         </Link>
       </div>
 
@@ -221,14 +231,21 @@ function Navbar({ onToggleTheme, themeMode, onToggleSidebar }) {
                   </div>
                   <div className="dropdown-item" onClick={() => {
                     setShowDropdown(false);
-                    window.open('https://support.google.com/youtube', '_blank');
+                    setShowHistoryModal(true);
+                  }}>
+                    <HistoryIcon className="icon" />
+                    <span>Report history</span>
+                  </div>
+                  <div className="dropdown-item" onClick={() => {
+                    setShowDropdown(false);
+                    setShowHelpModal(true);
                   }}>
                     <HelpOutlineIcon className="icon" />
                     <span>Help</span>
                   </div>
                   <div className="dropdown-item" onClick={() => {
                     setShowDropdown(false);
-                    window.open('mailto:support@mediastream.app?subject=Feedback', '_blank');
+                    setShowFeedbackModal(true);
                   }}>
                     <FeedbackIcon className="icon" />
                     <span>Send feedback</span>
@@ -298,6 +315,130 @@ function Navbar({ onToggleTheme, themeMode, onToggleSidebar }) {
               }}>
                 <LogoutIcon className="icon" />
                 <span>Sign out</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Help Modal */}
+      {showHelpModal && (
+        <div className="modal-overlay" onClick={() => setShowHelpModal(false)}>
+          <div className="help-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Help & Support</h3>
+              <button className="close-btn" onClick={() => setShowHelpModal(false)}>
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="modal-content">
+              <div className="help-section">
+                <h4>Getting Started</h4>
+                <ul>
+                  <li>Upload your first video by clicking the upload button</li>
+                  <li>Add a title, description, and thumbnail</li>
+                  <li>Choose visibility (public or private)</li>
+                </ul>
+              </div>
+              <div className="help-section">
+                <h4>Video Management</h4>
+                <ul>
+                  <li>Edit video details anytime from your uploads</li>
+                  <li>View analytics and watch time</li>
+                  <li>Delete videos from your channel</li>
+                </ul>
+              </div>
+              <div className="help-section">
+                <h4>Interaction</h4>
+                <ul>
+                  <li>Like and comment on videos</li>
+                  <li>Subscribe to creators</li>
+                  <li>Create playlists to organize content</li>
+                </ul>
+              </div>
+              <div className="help-section">
+                <h4>Need More Help?</h4>
+                <p>Email us at: <strong>support@mediastreaming.app</strong></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Modal */}
+      {showFeedbackModal && (
+        <div className="modal-overlay" onClick={() => setShowFeedbackModal(false)}>
+          <div className="feedback-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Send Feedback</h3>
+              <button className="close-btn" onClick={() => setShowFeedbackModal(false)}>
+                <CloseIcon />
+              </button>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              // Save feedback (you can integrate with your backend)
+              console.log('Feedback:', feedbackText);
+              alert('Thank you for your feedback!');
+              setFeedbackText('');
+              setShowFeedbackModal(false);
+            }} className="feedback-form">
+              <textarea 
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                placeholder="Tell us what you think about our platform..."
+                rows="6"
+              />
+              <div className="feedback-actions">
+                <button type="button" className="btn-secondary" onClick={() => {
+                  setFeedbackText('');
+                  setShowFeedbackModal(false);
+                }}>Cancel</button>
+                <button type="submit" className="btn-primary">
+                  <SendIcon /> Send
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Report History Modal */}
+      {showHistoryModal && (
+        <div className="modal-overlay" onClick={() => setShowHistoryModal(false)}>
+          <div className="history-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Report History</h3>
+              <button className="close-btn" onClick={() => setShowHistoryModal(false)}>
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="modal-content">
+              <div className="history-section">
+                <h4>Reported Issues</h4>
+                <div className="history-list">
+                  <div className="history-item">
+                    <span className="history-status resolved">Resolved</span>
+                    <span className="history-text">Video playback issue - 2025-12-20</span>
+                  </div>
+                  <div className="history-item">
+                    <span className="history-status pending">Pending</span>
+                    <span className="history-text">Upload speed improvement - 2025-12-18</span>
+                  </div>
+                  <div className="history-item">
+                    <span className="history-status resolved">Resolved</span>
+                    <span className="history-text">Comment moderation issue - 2025-12-15</span>
+                  </div>
+                </div>
+              </div>
+              <div className="history-section">
+                <h4>New Report</h4>
+                <button className="btn-primary" onClick={() => {
+                  setShowHistoryModal(false);
+                  alert('Report form would open here');
+                }}>
+                  Report an Issue
+                </button>
               </div>
             </div>
           </div>

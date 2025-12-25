@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { mediaAPI, commentAPI, userAPI, dailymotionAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useLikes } from '../context/LikesContext';
 import VideoPlayer from '../components/VideoPlayer';
 import Grid from '@mui/material/Grid';
 import {
@@ -38,6 +39,7 @@ function PlayMedia() {
   const [savingLater, setSavingLater] = useState(false);
   const [savedLater, setSavedLater] = useState(false);
   const { isAuthenticated } = useAuth();
+  const { isLiked, addLike, removeLike } = useLikes();
 
   const descriptionText = useMemo(() => {
     const raw = media?.description || 'No description provided.';
@@ -55,7 +57,7 @@ function PlayMedia() {
         const res = await mediaAPI.getMediaById(id);
         const m = res.media || res;
         setMedia(m);
-        setLiked(!!m?.liked);
+        setLiked(isLiked(m?._id) || !!m?.liked);
         if (isAuthenticated) {
           userAPI.addToWatchHistory(id).catch(() => {});
         }
@@ -78,6 +80,7 @@ function PlayMedia() {
             title: dmVideo.title,
             description: dmVideo.description,
             filePath: dmVideo.url, // ReactPlayer handles DM URLs
+            thumbnail: dmVideo.thumbnail_url || dmVideo.thumbnail_240_url || dmVideo.thumbnail_480_url || null,
             views: dmVideo.views_total,
             likes: 0,
             uploader: {
@@ -88,6 +91,7 @@ function PlayMedia() {
             created: new Date(dmVideo.created_time * 1000),
             isDailymotion: true
           });
+          setLiked(isLiked(dmVideo.id));
           // Clear error if DM succeeds
           setError('');
         } catch (dmErr) {
@@ -109,9 +113,26 @@ function PlayMedia() {
   }, [media, apiBase]);
 
   const handleLike = () => {
+    if (!media) return;
     const nextLiked = !liked;
     setLiked(nextLiked);
     setMedia((m) => ({ ...m, likes: Math.max(0, (m?.likes || 0) + (nextLiked ? 1 : -1)) }));
+
+    if (nextLiked) {
+      addLike({
+        id: media._id,
+        title: media.title,
+        thumbnail: media.thumbnail || '',
+        uploader: {
+          id: media.uploader?._id || '',
+          name: media.uploader?.name || media.uploader?.username || 'Unknown',
+        },
+        likedAt: Date.now(),
+      });
+    } else {
+      removeLike(media._id);
+    }
+
     const apiCall = nextLiked ? mediaAPI.likeMedia : mediaAPI.unlikeMedia;
     apiCall(id).catch((err) => {
       const msg = err?.message || '';
@@ -128,6 +149,22 @@ function PlayMedia() {
       // revert on unexpected failure
       setLiked(!nextLiked);
       setMedia((m) => ({ ...m, likes: Math.max(0, (m?.likes || 0) + (nextLiked ? -1 : 1)) }));
+
+      // revert local likes store too
+      if (nextLiked) {
+        removeLike(media._id);
+      } else {
+        addLike({
+          id: media._id,
+          title: media.title,
+          thumbnail: media.thumbnail || '',
+          uploader: {
+            id: media.uploader?._id || '',
+            name: media.uploader?.name || media.uploader?.username || 'Unknown',
+          },
+          likedAt: Date.now(),
+        });
+      }
     });
   };
 

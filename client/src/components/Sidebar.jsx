@@ -22,6 +22,14 @@ import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import AddIcon from '@mui/icons-material/Add';
 import LogoutIcon from '@mui/icons-material/Logout';
 
+const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:5002';
+
+const resolveThumb = (thumb) => {
+  if (!thumb) return '/placeholder.svg';
+  if (thumb.startsWith('http')) return thumb;
+  return `${apiBase}${thumb}`;
+};
+
 const getAvatar = (u) => {
   if (u && u.avatar) return u.avatar;
   const name = (u && (u.username || u.name || 'User')) || 'User';
@@ -39,6 +47,10 @@ const Sidebar = ({ open }) => {
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState('');
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
 
   const isActive = (path) => {
     if (path === '/' && location.pathname === '/') return true;
@@ -126,13 +138,13 @@ const Sidebar = ({ open }) => {
           <div className={`side-nav-item ${isActive('/settings') ? 'active' : ''}`} onClick={() => handleNavClick('/settings')}>
             <SettingsIcon className="icon" /> Settings
           </div>
-          <div className="side-nav-item" onClick={() => handleComingSoon('Report history')}>
+          <div className="side-nav-item" onClick={() => setShowHistoryModal(true)}>
             <FlagIcon className="icon" /> Report history
           </div>
-          <div className="side-nav-item" onClick={() => handleComingSoon('Help')}>
+          <div className="side-nav-item" onClick={() => setShowHelpModal(true)}>
             <HelpOutlineIcon className="icon" /> Help
           </div>
-          <div className="side-nav-item" onClick={() => handleComingSoon('Send feedback')}>
+          <div className="side-nav-item" onClick={() => setShowFeedbackModal(true)}>
             <FeedbackIcon className="icon" /> Send feedback
           </div>
         </div>
@@ -189,6 +201,105 @@ const Sidebar = ({ open }) => {
                 <span>Sign out</span>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report History Modal */}
+      {showHistoryModal && (
+        <div className="modal-overlay" onClick={() => setShowHistoryModal(false)}>
+          <div className="history-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Report history</h3>
+              <button className="close-btn" onClick={() => setShowHistoryModal(false)}>×</button>
+            </div>
+            <div className="modal-content">
+              <div className="history-section">
+                <h4>Reported Issues</h4>
+                <div className="history-list">
+                  <div className="history-item">
+                    <span className="history-status resolved">Resolved</span>
+                    <span className="history-text">Spam or misleading • Dec 25, 2025</span>
+                  </div>
+                  <div className="history-item">
+                    <span className="history-status pending">Pending</span>
+                    <span className="history-text">Harassment • Dec 24, 2025</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Help Modal */}
+      {showHelpModal && (
+        <div className="modal-overlay" onClick={() => setShowHelpModal(false)}>
+          <div className="help-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Help & Support</h3>
+              <button className="close-btn" onClick={() => setShowHelpModal(false)}>×</button>
+            </div>
+            <div className="modal-content">
+              <div className="help-section">
+                <h4>Getting Started</h4>
+                <ul>
+                  <li>Upload videos from the Upload page</li>
+                  <li>Like videos to save them in Liked videos</li>
+                  <li>Use Watch later to bookmark videos</li>
+                </ul>
+              </div>
+              <div className="help-section">
+                <h4>Common issues</h4>
+                <ul>
+                  <li>If a video doesn’t play, try reloading the page</li>
+                  <li>Check your internet connection and video format</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Modal */}
+      {showFeedbackModal && (
+        <div className="modal-overlay" onClick={() => setShowFeedbackModal(false)}>
+          <div className="feedback-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Send feedback</h3>
+              <button className="close-btn" onClick={() => setShowFeedbackModal(false)}>×</button>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                window.alert('Thanks! Your feedback was submitted.');
+                setFeedbackText('');
+                setShowFeedbackModal(false);
+              }}
+              className="feedback-form"
+            >
+              <textarea
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                placeholder="Tell us what you think about our platform..."
+                rows={6}
+              />
+              <div className="feedback-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setFeedbackText('');
+                    setShowFeedbackModal(false);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary">
+                  Send
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

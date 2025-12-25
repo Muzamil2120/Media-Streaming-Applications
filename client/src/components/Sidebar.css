@@ -72,3 +72,33 @@
   background-color: #e5e7eb;
   margin: 12px 0;
 }
+
+/* Dark theme */
+html[data-theme='dark'] .side-nav {
+  background: #111827;
+  border-right: 1px solid #1f2937;
+}
+
+html[data-theme='dark'] .side-nav-section {
+  border-bottom: 1px solid #1f2937;
+}
+
+html[data-theme='dark'] .side-nav-item {
+  color: #e5e7eb;
+}
+
+html[data-theme='dark'] .side-nav-item:hover {
+  background: #1f2937;
+}
+
+html[data-theme='dark'] .side-nav-item.active {
+  background: #1f2937;
+}
+
+html[data-theme='dark'] .side-nav-title {
+  color: #e5e7eb;
+}
+
+html[data-theme='dark'] .side-nav-divider {
+  background-color: #1f2937;
+}
