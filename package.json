@@ -9,6 +9,8 @@
     "dev": "nodemon server/server.js",
     "development": "nodemon server/server.js",
     "build": "echo 'Build script not configured'",
+    "build-vercel": "cd client && npm ci --omit=dev && npm run build",
+    "build-versel": "npm run build-vercel",
     "start:prod": "node server/server.js",
     "start:dev": "concurrently \"npm run dev\" \"cd client && npm start\""
   },
