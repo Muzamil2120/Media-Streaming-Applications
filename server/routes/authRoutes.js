@@ -14,12 +14,18 @@ router.post('/register', async (req, res) => {
   console.log('Request body:', req.body);
   
   try {
-    const { username, email, password } = req.body;
+    const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
+    const email = typeof req.body.email === 'string' ? req.body.email.trim() : '';
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
     
     // Validate input
-    if (!username || !email || !password) {
-      console.log('❌ Missing required fields');
-      return res.status(400).json({ message: 'All fields are required' });
+    const missing = [];
+    if (!username) missing.push('username');
+    if (!email) missing.push('email');
+    if (!password) missing.push('password');
+    if (missing.length) {
+      console.log('❌ Missing required fields:', missing);
+      return res.status(400).json({ message: 'All fields are required', missing });
     }
     
     console.log('🔍 Checking for existing user...');

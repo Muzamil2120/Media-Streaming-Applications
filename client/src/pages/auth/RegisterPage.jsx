@@ -20,7 +20,18 @@ function RegisterPage() {
     setError('');
     setLoading(true);
 
-    if (formData.password !== formData.confirmPassword) {
+    const username = (formData.username || '').trim();
+    const email = (formData.email || '').trim();
+    const password = formData.password || '';
+    const confirmPassword = formData.confirmPassword || '';
+
+    if (!username || !email || !password) {
+      setError('Username, email, and password are required');
+      setLoading(false);
+      return;
+    }
+
+    if (password !== confirmPassword) {
       setError('Passwords do not match');
       setLoading(false);
       return;
@@ -28,9 +39,9 @@ function RegisterPage() {
 
     try {
       const response = await register({
-        username: formData.username,
-        email: formData.email,
-        password: formData.password
+        username,
+        email,
+        password
       });
       console.log('Registration successful:', response);
       setShowSuccess(true);
