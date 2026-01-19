@@ -3,10 +3,8 @@ const router = express.Router();
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const dotenv = require('dotenv');
+const config = require('../../config/config');
 const auth = require('../middleware/auth');
-
-dotenv.config();
 
 // Register route
 router.post('/register', async (req, res) => {
@@ -48,7 +46,7 @@ router.post('/register', async (req, res) => {
     // Create JWT token
     const token = jwt.sign(
       { id: savedUser._id, username: savedUser.username },
-      process.env.JWT_SECRET,
+      config.jwtSecret,
       { expiresIn: '1h' }
     );
     
@@ -106,7 +104,7 @@ router.post('/signin', async (req, res) => {
     // Create JWT token
     const token = jwt.sign(
       { id: user._id, username: user.username },
-      process.env.JWT_SECRET,
+      config.jwtSecret,
       { expiresIn: '1h' }
     );
     
@@ -139,7 +137,7 @@ router.get('/me', async (req, res) => {
     }
     
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, config.jwtSecret);
     
     // Find user by ID
     const user = await User.findById(decoded.id).select('-password');
