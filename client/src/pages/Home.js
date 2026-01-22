@@ -26,29 +26,69 @@ function Home({ initialNav = 'home' }) {
         dailymotionAPI.getTrending().catch(() => [])
       ]);
 
-      const normalizedDM = dmData.map(video => ({
-        _id: video.id,
-        title: video.title,
-        description: video.description,
-        thumbnailUrl: video.thumbnail_url,
-        views: video.views_total,
-        duration: formatDuration(video.duration),
-        uploader: {
-          _id: 'dailymotion',
-          username: video['channel.name'] || 'Dailymotion',
-          avatar: null
-        },
-        created: new Date(),
-        isDailymotion: true
-      }));
+      const normalizedDM = dmData.map((video) => {
+        const bestThumb = video.thumbnail_720_url || video.thumbnail_480_url || video.thumbnail_url;
+        const safeThumb = typeof bestThumb === 'string' && bestThumb.startsWith('//') ? `https:${bestThumb}` : bestThumb;
+        const safeUrl = (() => {
+          const page = video.url;
+          if (typeof page === 'string' && page.trim()) {
+            if (page.startsWith('//')) return `https:${page}`;
+            if (page.startsWith('http://')) return page.replace(/^http:\/\//i, 'https://');
+            return page;
+          }
+          const id = video.id ? String(video.id) : '';
+          return id ? `https://www.dailymotion.com/video/${id}` : '';
+        })();
+
+        return {
+          _id: video.id,
+          title: video.title,
+          description: video.description,
+          thumbnailUrl: safeThumb,
+          views: video.views_total,
+          duration: formatDuration(video.duration),
+          uploader: {
+            _id: 'dailymotion',
+            username: video['channel.name'] || 'Dailymotion',
+            avatar: null,
+          },
+          createdAt: video.created_time ? new Date(video.created_time * 1000).toISOString() : new Date().toISOString(),
+          isDailymotion: true,
+          filePath: safeUrl,
+        };
+      });
 
       const localVideos = Array.isArray(localData) ? localData : (localData.media || []);
-      const normalizedLocal = localVideos.map(video => ({
-        ...video,
-        thumbnailUrl: video.thumbnail || video.thumbnailUrl,
-        uploader: video.uploader || video.postedBy || { username: 'Unknown' },
-        duration: typeof video.duration === 'number' ? formatDuration(video.duration) : video.duration
-      }));
+      const normalizedLocal = localVideos.map(video => {
+        const rawThumb = video.thumbnail || video.thumbnailUrl || '';
+        const normalizedThumb = rawThumb
+          ? (rawThumb.startsWith('//')
+            ? `https:${rawThumb}`
+            : rawThumb.startsWith('http')
+              ? rawThumb
+              : `${process.env.REACT_APP_API_URL || 'http://localhost:5002'}${rawThumb}`)
+          : '';
+
+        const uploaderObj = video?.uploader && typeof video.uploader === 'object' ? video.uploader : null;
+        const rawAvatar = uploaderObj?.avatar || video?.uploaderAvatar || '';
+        const normalizedAvatar = rawAvatar
+          ? (rawAvatar.startsWith('data:') || rawAvatar.startsWith('blob:')
+            ? rawAvatar
+            : rawAvatar.startsWith('//')
+              ? `https:${rawAvatar}`
+              : rawAvatar.startsWith('http')
+                ? rawAvatar
+                : `${process.env.REACT_APP_API_URL || 'http://localhost:5002'}${rawAvatar}`)
+          : '';
+
+        return {
+          ...video,
+          thumbnailUrl: normalizedThumb,
+          avatarUrl: normalizedAvatar,
+          uploader: video.uploader || video.postedBy || { username: 'Unknown' },
+          duration: typeof video.duration === 'number' ? formatDuration(video.duration) : video.duration
+        };
+      });
 
       const filteredLocal = user?._id
         ? normalizedLocal.filter((v) => (v?.uploader?._id || v?.uploader?.id) !== user._id)
@@ -100,10 +140,25 @@ function Home({ initialNav = 'home' }) {
                     </span>
                   </div>
                   <div className="dm-info">
-                    <h3 className="dm-title" title={video.title}>{video.title}</h3>
-                    <div className="dm-meta">
-                      <span>{video.uploader?.username || video.uploader?.name || 'Unknown User'}</span>
-                      <span>{video.views ? `${video.views} views` : 'No views'}</span>
+                    {!video.isDailymotion && video.avatarUrl && (
+                      <div className="dm-avatar">
+                        <img
+                          src={video.avatarUrl}
+                          alt={video.uploader?.username || video.uploader?.name || 'Channel'}
+                          onError={(e) => {
+                            if (e.currentTarget.dataset.fallbackApplied) return;
+                            e.currentTarget.dataset.fallbackApplied = 'true';
+                            e.currentTarget.src = '/placeholder.svg';
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div className="dm-info-body">
+                      <h3 className="dm-title" title={video.title}>{video.title}</h3>
+                      <div className="dm-meta">
+                        <span>{video.uploader?.username || video.uploader?.name || 'Unknown User'}</span>
+                        <span>{video.views ? `${video.views} views` : 'No views'}</span>
+                      </div>
                     </div>
                   </div>
                 </div>

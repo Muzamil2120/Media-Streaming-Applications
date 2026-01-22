@@ -31,23 +31,38 @@ const SearchPage = () => {
         thumbnail: v.thumbnail || v.thumbnailUrl // Ensure thumbnail property exists
       }));
 
-      const dmVideos = dmRes.map(video => ({
-        _id: video.id,
-        title: video.title,
-        description: video.description,
-        thumbnail: video.thumbnail_url,
-        thumbnailUrl: video.thumbnail_url,
-        views: video.views_total,
-        duration: formatDuration(video.duration),
-        uploader: {
-          _id: 'dailymotion',
-          username: video['channel.name'] || 'Dailymotion',
-          avatar: null
-        },
-        created: new Date(),
-        isDailymotion: true,
-        filePath: video.url
-      }));
+      const dmVideos = dmRes.map((video) => {
+        const bestThumb = video.thumbnail_720_url || video.thumbnail_480_url || video.thumbnail_url;
+        const safeThumb = typeof bestThumb === 'string' && bestThumb.startsWith('//') ? `https:${bestThumb}` : bestThumb;
+        const safeUrl = (() => {
+          const page = video.url;
+          if (typeof page === 'string' && page.trim()) {
+            if (page.startsWith('//')) return `https:${page}`;
+            if (page.startsWith('http://')) return page.replace(/^http:\/\//i, 'https://');
+            return page;
+          }
+          const id = video.id ? String(video.id) : '';
+          return id ? `https://www.dailymotion.com/video/${id}` : '';
+        })();
+
+        return {
+          _id: video.id,
+          title: video.title,
+          description: video.description,
+          thumbnail: safeThumb,
+          thumbnailUrl: safeThumb,
+          views: video.views_total,
+          duration: formatDuration(video.duration),
+          uploader: {
+            _id: 'dailymotion',
+            username: video['channel.name'] || 'Dailymotion',
+            avatar: null,
+          },
+          createdAt: video.created_time ? new Date(video.created_time * 1000).toISOString() : new Date().toISOString(),
+          isDailymotion: true,
+          filePath: safeUrl,
+        };
+      });
       
       setResults([...localVideos, ...dmVideos]);
       setLoading(false);

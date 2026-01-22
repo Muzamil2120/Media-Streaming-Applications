@@ -27,6 +27,12 @@ const apiCall = async (endpoint, options = {}) => {
 
     const bodyText = await response.text();
 
+    if (response.status === 401) {
+      // Token expired/invalid: clear local auth so UI can prompt re-login
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
+
     if (!response.ok) {
       let parsed;
       try {
@@ -268,12 +274,22 @@ export const userAPI = {
 
   subscribe: (userId) =>
     apiCall(`/api/users/${userId}/subscribe`, {
-      method: 'POST', 
+      method: 'POST',
+    }).then((res) => {
+      if (res?.user) {
+        localStorage.setItem('user', JSON.stringify(res.user));
+      }
+      return res;
     }),
 
   unsubscribe: (userId) =>
     apiCall(`/api/users/${userId}/unsubscribe`, {
       method: 'POST',
+    }).then((res) => {
+      if (res?.user) {
+        localStorage.setItem('user', JSON.stringify(res.user));
+      }
+      return res;
     }),
 
   getSubscriptions: (userId) =>
@@ -334,7 +350,8 @@ export const userAPI = {
 // Dailymotion API (public)
 export const dailymotionAPI = {
   getTrending: async (page = 1, limit = 20) => {
-    const url = `${DM_BASE_URL}/videos?fields=id,title,description,thumbnail_url,views_total,duration,url,channel.name&sort=trending&page=${page}&limit=${limit}`;
+    const fields = 'id,title,description,thumbnail_url,thumbnail_480_url,thumbnail_720_url,views_total,duration,url,embed_url,channel.name,created_time';
+    const url = `${DM_BASE_URL}/videos?fields=${fields}&sort=trending&page=${page}&limit=${limit}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to load Dailymotion trending');
     const data = await res.json();
@@ -342,7 +359,8 @@ export const dailymotionAPI = {
   },
 
   search: async (query, page = 1, limit = 20) => {
-    const url = `${DM_BASE_URL}/videos?fields=id,title,description,thumbnail_url,views_total,duration,url,channel.name&search=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
+    const fields = 'id,title,description,thumbnail_url,thumbnail_480_url,thumbnail_720_url,views_total,duration,url,embed_url,channel.name,created_time';
+    const url = `${DM_BASE_URL}/videos?fields=${fields}&search=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to search Dailymotion');
     const data = await res.json();
@@ -351,7 +369,8 @@ export const dailymotionAPI = {
 
   getShortsByTopic: async (topic = 'shorts', page = 1, limit = 12) => {
     const query = encodeURIComponent(topic);
-    const url = `${DM_BASE_URL}/videos?fields=id,title,thumbnail_url,views_total,duration,url,channel.name&search=${query}&page=${page}&limit=${limit}&sort=trending`;
+    const fields = 'id,title,thumbnail_url,thumbnail_480_url,thumbnail_720_url,views_total,duration,url,embed_url,channel.name,created_time';
+    const url = `${DM_BASE_URL}/videos?fields=${fields}&search=${query}&page=${page}&limit=${limit}&sort=trending`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to load shorts');
     const data = await res.json();
@@ -361,7 +380,8 @@ export const dailymotionAPI = {
   },
 
   getVideoById: async (id) => {
-    const url = `${DM_BASE_URL}/video/${id}?fields=id,title,description,thumbnail_url,views_total,duration,url,channel.name,created_time`;
+    const fields = 'id,title,description,thumbnail_url,thumbnail_480_url,thumbnail_720_url,views_total,duration,url,embed_url,channel.name,created_time';
+    const url = `${DM_BASE_URL}/video/${id}?fields=${fields}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to load Dailymotion video');
     return await res.json();

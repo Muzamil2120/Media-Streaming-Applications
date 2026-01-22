@@ -124,15 +124,24 @@ router.post('/:id/subscribe', auth, async (req, res) => {
     const targetUser = await User.findById(targetId);
     if (!targetUser) return res.status(404).json({ message: 'User not found' });
 
-    await User.findByIdAndUpdate(req.user.id, {
-      $addToSet: { subscriptions: targetId }
-    });
+    const [updatedUser, updatedTarget] = await Promise.all([
+      User.findByIdAndUpdate(
+        req.user.id,
+        { $addToSet: { subscriptions: targetId } },
+        { new: true }
+      ).select('-password'),
+      User.findByIdAndUpdate(
+        targetId,
+        { $addToSet: { subscribers: req.user.id } },
+        { new: true }
+      ).select('-password')
+    ]);
 
-    await User.findByIdAndUpdate(targetId, {
-      $addToSet: { subscribers: req.user.id }
+    res.json({
+      message: 'Subscribed',
+      user: updatedUser,
+      target: updatedTarget,
     });
-
-    res.json({ message: 'Subscribed' });
   } catch (error) {
     console.error('❌ Error subscribing:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -147,15 +156,24 @@ router.post('/:id/unsubscribe', auth, async (req, res) => {
       return res.status(400).json({ message: 'Invalid user ID format' });
     }
 
-    await User.findByIdAndUpdate(req.user.id, {
-      $pull: { subscriptions: targetId }
-    });
+    const [updatedUser, updatedTarget] = await Promise.all([
+      User.findByIdAndUpdate(
+        req.user.id,
+        { $pull: { subscriptions: targetId } },
+        { new: true }
+      ).select('-password'),
+      User.findByIdAndUpdate(
+        targetId,
+        { $pull: { subscribers: req.user.id } },
+        { new: true }
+      ).select('-password')
+    ]);
 
-    await User.findByIdAndUpdate(targetId, {
-      $pull: { subscribers: req.user.id }
+    res.json({
+      message: 'Unsubscribed',
+      user: updatedUser,
+      target: updatedTarget,
     });
-
-    res.json({ message: 'Unsubscribed' });
   } catch (error) {
     console.error('❌ Error unsubscribing:', error);
     res.status(500).json({ message: 'Server error', error: error.message });

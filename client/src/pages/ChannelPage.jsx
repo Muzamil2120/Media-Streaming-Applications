@@ -44,7 +44,8 @@ const ChannelPage = () => {
         userAPI.getUserProfile(channelId),
         userAPI.getUserUploads(channelId, 1, 50),
       ]);
-      setChannel(profileRes);
+      const fetched = profileRes?.user || profileRes;
+      setChannel(fetched);
       const list = uploadsRes.uploads || uploadsRes || [];
       setUploads(list);
     } catch (err) {

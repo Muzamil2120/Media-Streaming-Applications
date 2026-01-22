@@ -41,6 +41,48 @@ function PlayMedia() {
   const { isAuthenticated } = useAuth();
   const { isLiked, addLike, removeLike } = useLikes();
 
+  const isMongoObjectId = useMemo(() => /^[a-f\d]{24}$/i.test(String(id || '')), [id]);
+  const normalizeRemoteUrl = (u) => {
+    if (!u || typeof u !== 'string') return '';
+    if (u.startsWith('//')) return `https:${u}`;
+    // Avoid mixed-content issues in production by upgrading common provider URLs.
+    if (u.startsWith('http://')) {
+      try {
+        const parsed = new URL(u);
+        const host = (parsed.hostname || '').toLowerCase();
+        if (host.endsWith('dailymotion.com') || host.endsWith('dmcdn.net')) {
+          return `https://${parsed.host}${parsed.pathname}${parsed.search}${parsed.hash}`;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return u;
+  };
+
+  const pickPlayableDailymotionUrl = (dmVideo) => {
+    const dmId = dmVideo?.id ? String(dmVideo.id) : '';
+
+    const page = normalizeRemoteUrl(dmVideo?.url || '');
+    if (page) return page;
+
+    const embed = normalizeRemoteUrl(dmVideo?.embed_url || '');
+    if (embed) {
+      // Newer API responses often return geo.dailymotion.com/player.html?video=<id>
+      // ReactPlayer's Dailymotion handler is most reliable with the canonical page URL.
+      try {
+        const parsed = new URL(embed);
+        const qVideo = parsed.searchParams.get('video');
+        const idFromEmbed = qVideo || dmId;
+        if (idFromEmbed) return `https://www.dailymotion.com/video/${idFromEmbed}`;
+      } catch {
+        // ignore
+      }
+    }
+
+    return dmId ? `https://www.dailymotion.com/video/${dmId}` : '';
+  };
+
   const descriptionText = useMemo(() => {
     const raw = media?.description || 'No description provided.';
     // Convert <br> tags to newlines and render with whitespace preserved
@@ -53,61 +95,67 @@ function PlayMedia() {
     
     const fetchVideo = async () => {
       try {
-        // Try backend first
-        const res = await mediaAPI.getMediaById(id);
-        const m = res.media || res;
-        setMedia(m);
-        setLiked(isLiked(m?._id) || !!m?.liked);
-        if (isAuthenticated) {
-          userAPI.addToWatchHistory(id).catch(() => {});
+        // If the ID looks like a Mongo ObjectId, load from our backend.
+        // Otherwise assume it's a provider ID (e.g., Dailymotion) and skip the slow 404.
+        if (isMongoObjectId) {
+          const res = await mediaAPI.getMediaById(id);
+          const m = res.media || res;
+          setMedia(m);
+          setLiked(isLiked(m?._id) || !!m?.liked);
+          if (isAuthenticated) {
+            userAPI.addToWatchHistory(id).catch(() => {});
+          }
+
+          // Related data only for local videos
+          mediaAPI.getRecommendations(id)
+            .then(res => setRecommendations(res.recommendations || res.media || res || []))
+            .catch(() => setRecommendations([]));
+          commentAPI.getComments(id)
+            .then(res => setComments(res.comments || res || []))
+            .catch(() => setComments([]));
+          return;
         }
-        
-        // Fetch related data only if local video found
-        mediaAPI.getRecommendations(id)
-          .then(res => setRecommendations(res.recommendations || res.media || res || []))
-          .catch(() => setRecommendations([]));
-        commentAPI.getComments(id)
-          .then(res => setComments(res.comments || res || []))
-          .catch(() => setComments([]));
+
+        const dmVideo = await dailymotionAPI.getVideoById(id);
+        const dmThumb = normalizeRemoteUrl(dmVideo.thumbnail_720_url || dmVideo.thumbnail_480_url || dmVideo.thumbnail_url || '');
+        const dmPlayableUrl = pickPlayableDailymotionUrl(dmVideo);
+
+        setMedia({
+          _id: dmVideo.id,
+          title: dmVideo.title,
+          description: dmVideo.description,
+          // Prefer canonical page URL; embed_url can be geo.* player.html which ReactPlayer may not detect.
+          filePath: dmPlayableUrl,
+          thumbnail: dmThumb || null,
+          views: dmVideo.views_total,
+          likes: 0,
+          uploader: {
+            _id: 'dm',
+            name: dmVideo['channel.name'] || 'Dailymotion',
+            avatar: null
+          },
+          createdAt: dmVideo.created_time ? new Date(dmVideo.created_time * 1000).toISOString() : new Date().toISOString(),
+          isDailymotion: true
+        });
+        setLiked(isLiked(dmVideo.id));
+        setError('');
+        setRecommendations([]);
+        setComments([]);
 
       } catch (err) {
-        // If backend fails, try Dailymotion
-        console.log('Local fetch failed, trying Dailymotion...', err);
-        try {
-          const dmVideo = await dailymotionAPI.getVideoById(id);
-          setMedia({
-            _id: dmVideo.id,
-            title: dmVideo.title,
-            description: dmVideo.description,
-            filePath: dmVideo.url, // ReactPlayer handles DM URLs
-            thumbnail: dmVideo.thumbnail_url || dmVideo.thumbnail_240_url || dmVideo.thumbnail_480_url || null,
-            views: dmVideo.views_total,
-            likes: 0,
-            uploader: {
-              _id: 'dm',
-              name: dmVideo['channel.name'] || 'Dailymotion',
-              avatar: null
-            },
-            created: new Date(dmVideo.created_time * 1000),
-            isDailymotion: true
-          });
-          setLiked(isLiked(dmVideo.id));
-          // Clear error if DM succeeds
-          setError('');
-        } catch (dmErr) {
-          console.error('DM fetch failed:', dmErr);
-          setError('Video not found. Please check the video ID and try again.');
-        }
+        console.error(err);
+        setError(err?.message || 'Video not found. Please check the video ID and try again.');
       } finally {
         setLoading(false);
       }
     };
 
     fetchVideo();
-  }, [id, isAuthenticated]);
+  }, [id, isAuthenticated, isLiked, isMongoObjectId]);
 
   const videoSrc = useMemo(() => {
     if (!media || !media.filePath) return '';
+    if (media.filePath.startsWith('//')) return `https:${media.filePath}`;
     if (media.filePath.startsWith('http')) return media.filePath;
     return `${apiBase}${media.filePath}`;
   }, [media, apiBase]);

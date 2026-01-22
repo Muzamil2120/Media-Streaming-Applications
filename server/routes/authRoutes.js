@@ -149,6 +149,9 @@ router.get('/me', async (req, res) => {
     res.json({ user });
   } catch (error) {
     console.error('❌ GET PROFILE ERROR:', error);
+    if (error?.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token expired' });
+    }
     res.status(401).json({ message: 'Token is not valid' });
   }
 });

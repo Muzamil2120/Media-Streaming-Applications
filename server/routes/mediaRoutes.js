@@ -122,6 +122,51 @@ const remuxFaststart = (inputPath, outputPath) => {
   });
 };
 
+const generateThumbnailFromVideo = (inputPath, outputPath) => {
+  return new Promise((resolve, reject) => {
+    if (!ffmpegPath) {
+      return reject(new Error('ffmpeg is not available (ffmpeg-static not installed)'));
+    }
+
+    const args = [
+      '-y',
+      // Seek a little into the video for a nicer frame; if the video is very short ffmpeg will still try.
+      '-ss', '00:00:00.500',
+      '-i', inputPath,
+      '-frames:v', '1',
+      // Keep a reasonable size for UI.
+      '-vf', 'scale=640:-2',
+      // Quality (lower is better); good balance for thumbnails.
+      '-q:v', '3',
+      outputPath,
+    ];
+
+    const child = spawn(ffmpegPath, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    let stderr = '';
+
+    const timeoutMs = Number.parseInt(process.env.THUMBNAIL_TIMEOUT_MS || '60000', 10);
+    const timeout = setTimeout(() => {
+      try { child.kill('SIGKILL'); } catch { /* ignore */ }
+      reject(new Error(`ffmpeg (thumbnail) timed out after ${timeoutMs}ms. args=${JSON.stringify(args)}`));
+    }, Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 60000);
+
+    child.stderr.on('data', (d) => {
+      stderr += d.toString();
+    });
+
+    child.on('error', (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
+
+    child.on('close', (code) => {
+      clearTimeout(timeout);
+      if (code === 0) return resolve();
+      reject(new Error(`ffmpeg (thumbnail) failed (code ${code}). ${stderr.slice(-2000)}`));
+    });
+  });
+};
+
 // Quick probe using ffmpeg itself (no ffprobe dependency).
 // ffmpeg prints codec info then exits with non-zero because no output is specified.
 const probeMediaInfo = (inputPath) => {
@@ -300,6 +345,21 @@ router.post('/upload', requireAuth, upload.fields([{ name: 'video', maxCount: 1 
       }
     }
 
+    // If no thumbnail was uploaded, try to generate one from the final video.
+    let thumbnailPath = thumbFile ? `/uploads/${thumbFile.filename}` : '';
+    if (!thumbnailPath && ffmpegPath) {
+      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      const thumbFilename = `thumb-${uniqueSuffix}.jpg`;
+      const finalVideoPath = path.join(uploadsDir, finalFilename);
+      const thumbOutputPath = path.join(uploadsDir, thumbFilename);
+      try {
+        await generateThumbnailFromVideo(finalVideoPath, thumbOutputPath);
+        thumbnailPath = `/uploads/${thumbFilename}`;
+      } catch (e) {
+        console.warn('⚠️ Thumbnail generation failed; continuing without thumbnail:', e.message);
+      }
+    }
+
     const media = new Media({
       title,
       description,
@@ -307,7 +367,7 @@ router.post('/upload', requireAuth, upload.fields([{ name: 'video', maxCount: 1 
       originalName: videoFile.originalname,
       filePath: `/uploads/${finalFilename}`,
       fileSize: finalSize,
-      thumbnail: thumbFile ? `/uploads/${thumbFile.filename}` : '',
+      thumbnail: thumbnailPath,
       category: category || 'Other',
       tags: tags ? tags.split(',').map(tag => tag.trim()) : [],
       isPublic: isPublic !== 'false',

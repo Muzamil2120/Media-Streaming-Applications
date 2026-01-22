@@ -22,6 +22,17 @@ app.use(
       // Allow non-browser clients (no Origin header)
       if (!origin) return callback(null, true);
 
+      // In development, allow LAN origins so the app works via IP (e.g. phone testing)
+      // without constantly updating allowlists.
+      if ((process.env.NODE_ENV || 'development') !== 'production') {
+        const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+        const isPrivateIp =
+          /^https?:\/\/(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$/i.test(
+            origin
+          );
+        if (isLocalhost || isPrivateIp) return callback(null, true);
+      }
+
       // Allow explicitly configured origins
       if (allowedOrigins.includes(origin)) return callback(null, true);
 

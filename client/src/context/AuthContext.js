@@ -28,10 +28,12 @@ export const AuthProvider = ({ children }) => {
       try {
         const response = await authAPI.getProfile();
         setUser(response.user);
+        localStorage.setItem('user', JSON.stringify(response.user));
       } catch (error) {
         console.error('Authentication check failed:', error);
         // Clear invalid token
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
         setUser(null);
       } finally {
         setLoading(false);
@@ -45,6 +47,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authAPI.signin(userData);
       localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
       setUser(response.user);
       return response;
     } catch (error) {
@@ -56,6 +59,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authAPI.register(userData);
       localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
       setUser(response.user);
       return response;
     } catch (error) {
@@ -65,6 +69,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
   };
 

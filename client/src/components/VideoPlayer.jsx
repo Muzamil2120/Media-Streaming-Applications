@@ -68,6 +68,43 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
     return isFileExt && isUploadsPath && (isHttpLocalhost || isRelativeUploads);
   }, [url]);
 
+  const dailymotionId = useMemo(() => {
+    if (!url || typeof url !== 'string') return '';
+    try {
+      const parsed = new URL(url, window.location.origin);
+      const host = (parsed.hostname || '').toLowerCase();
+
+      // Canonical page: https://www.dailymotion.com/video/<id>
+      if (host.endsWith('dailymotion.com')) {
+        const parts = (parsed.pathname || '').split('/').filter(Boolean);
+        const videoIdx = parts.indexOf('video');
+        if (videoIdx !== -1 && parts[videoIdx + 1]) return parts[videoIdx + 1];
+      }
+
+      // Geo player: https://geo.dailymotion.com/player.html?video=<id>
+      if (host.endsWith('dailymotion.com')) {
+        const q = parsed.searchParams.get('video');
+        if (q) return q;
+      }
+
+      return '';
+    } catch {
+      const m = String(url).match(/dailymotion\.com\/video\/([A-Za-z0-9]+)/i);
+      return m ? m[1] : '';
+    }
+  }, [url]);
+
+  const isDailymotionProvider = useMemo(() => {
+    if (!url || typeof url !== 'string') return false;
+    return /dailymotion\.com/i.test(url) || !!dailymotionId;
+  }, [url, dailymotionId]);
+
+  const dailymotionEmbedUrl = useMemo(() => {
+    if (!isDailymotionProvider || !dailymotionId) return '';
+    const autoplay = autoPlay ? 1 : 0;
+    return `https://geo.dailymotion.com/player.html?video=${encodeURIComponent(dailymotionId)}&autoplay=${autoplay}`;
+  }, [isDailymotionProvider, dailymotionId, autoPlay]);
+
   // If the server file is missing (404), show a clear message.
   useEffect(() => {
     if (!isLocalUploadedFile || !url) return;
@@ -94,10 +131,23 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
 
   const getFileExtension = (inputUrl) => {
     if (!inputUrl || typeof inputUrl !== 'string') return '';
-    const cleaned = inputUrl.split('?')[0].split('#')[0];
-    const lastDot = cleaned.lastIndexOf('.');
-    if (lastDot === -1) return '';
-    return cleaned.slice(lastDot + 1).toLowerCase();
+
+    // Only treat real file URLs as having an extension.
+    // For provider URLs like https://www.dailymotion.com/video/xyz, we must NOT
+    // interpret ".com/video/xyz" as a file extension.
+    try {
+      const parsed = new URL(inputUrl, window.location.origin);
+      const lastSegment = (parsed.pathname || '').split('/').filter(Boolean).pop() || '';
+      const dot = lastSegment.lastIndexOf('.');
+      if (dot === -1) return '';
+      return lastSegment.slice(dot + 1).toLowerCase();
+    } catch (e) {
+      const cleaned = inputUrl.split('?')[0].split('#')[0];
+      const lastSegment = cleaned.split('/').filter(Boolean).pop() || '';
+      const dot = lastSegment.lastIndexOf('.');
+      if (dot === -1) return '';
+      return lastSegment.slice(dot + 1).toLowerCase();
+    }
   };
 
   const isBrowserPlayableExtension = (ext) => {
@@ -116,10 +166,17 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
     setPlaying(false);
 
     const currentPlayer = playerRef.current;
+    const currentNativeVideo = nativeVideoRef.current;
 
     const ext = getFileExtension(url);
-    if (ext && !isBrowserPlayableExtension(ext)) {
-      setFormatError(`This video format (.${ext}) isn't supported by most browsers. Upload MP4 or WebM for reliable playback.`);
+    // IMPORTANT:
+    // Only enforce file-extension restrictions for *our own uploaded files*.
+    // Provider URLs (e.g. Dailymotion embed URLs often ending in `.html`) are not
+    // direct video files and should be handled by ReactPlayer.
+    if (isLocalUploadedFile && ext && !isBrowserPlayableExtension(ext)) {
+      setFormatError(
+        `This video format (.${ext}) isn't supported by most browsers. Upload MP4 or WebM for reliable playback.`
+      );
       setPlaying(false);
     }
 
@@ -134,16 +191,16 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
       }
 
       // Stop native video too
-      if (nativeVideoRef.current) {
+      if (currentNativeVideo) {
         try {
-          nativeVideoRef.current.pause();
+          currentNativeVideo.pause();
         } catch (e) {
           // ignore
         }
       }
       isMountedRef.current = false;
     };
-  }, [url, autoPlay]);
+  }, [url, autoPlay, isLocalUploadedFile]);
 
   // Safe autoplay: delay slightly and start muted to satisfy browser policies.
   // This avoids the common browser warning: "The play() request was interrupted by a call to pause()".
@@ -281,8 +338,11 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
     };
   }, []);
 
-  const showNativeFallback = !!loadError;
+  const showNativeFallback = isLocalUploadedFile && !!loadError;
+  const showProviderError = !isLocalUploadedFile && !!loadError;
   const showFormatError = !!formatError;
+
+  const useDailymotionIframe = !isLocalUploadedFile && !!dailymotionEmbedUrl;
 
   return (
     <Box
@@ -341,11 +401,38 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
             }
           }}
         />
+      ) : useDailymotionIframe ? (
+        <Box sx={{ position: 'absolute', inset: 0, bgcolor: '#000' }}>
+          <iframe
+            title={title || 'Dailymotion player'}
+            src={dailymotionEmbedUrl}
+            style={{ width: '100%', height: '100%', border: 0, background: '#000' }}
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowFullScreen
+          />
+          <Box sx={{ position: 'absolute', top: 12, right: 12 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              sx={{ borderColor: 'rgba(255,255,255,0.35)', color: '#fff', bgcolor: 'rgba(0,0,0,0.35)' }}
+              onClick={() => {
+                try {
+                  const page = dailymotionId ? `https://www.dailymotion.com/video/${dailymotionId}` : url;
+                  window.open(page, '_blank', 'noopener,noreferrer');
+                } catch {
+                  // ignore
+                }
+              }}
+            >
+              Open
+            </Button>
+          </Box>
+        </Box>
       ) : (
         <ReactPlayer
           ref={playerRef}
           url={url}
-          playing={playing && !showNativeFallback && !showFormatError && isMountedRef.current}
+          playing={playing && !showNativeFallback && !showProviderError && !showFormatError && isMountedRef.current}
           volume={volume}
           muted={muted}
           playbackRate={playbackRate}
@@ -391,6 +478,14 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
                 controls: 0,
                 modestbranding: 1,
                 rel: 0,
+              },
+            },
+            dailymotion: {
+              params: {
+                autoplay: 0,
+                mute: 0,
+                'ui-start-screen-info': 0,
+                'ui-logo': 0,
               },
             },
             file: {
@@ -446,8 +541,46 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
         </Box>
       )}
 
+      {/* Provider error fallback (e.g., Dailymotion) */}
+      {showProviderError && !showFormatError && (
+        <Box sx={{ position: 'absolute', inset: 0, p: 2, bgcolor: '#000' }}>
+          <Typography variant="body2" sx={{ color: '#fff', mb: 1 }}>
+            {title || 'Video'} can\'t be played.
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', display: 'block', mb: 2 }}>
+            {loadError}
+          </Typography>
+
+          {isDailymotionProvider && dailymotionId ? (
+            <Box sx={{ width: '100%', height: '100%', maxHeight: '100%', borderRadius: 2, overflow: 'hidden' }}>
+              <iframe
+                title={title || 'Dailymotion player'}
+                src={`https://geo.dailymotion.com/player.html?video=${encodeURIComponent(dailymotionId)}&autoplay=1`}
+                style={{ width: '100%', height: '100%', border: 0, background: '#000' }}
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowFullScreen
+              />
+            </Box>
+          ) : (
+            <Button
+              variant="outlined"
+              sx={{ alignSelf: 'flex-start', borderColor: 'rgba(255,255,255,0.35)', color: '#fff' }}
+              onClick={() => {
+                try {
+                  window.open(url, '_blank', 'noopener,noreferrer');
+                } catch {
+                  // ignore
+                }
+              }}
+            >
+              Open in new tab
+            </Button>
+          )}
+        </Box>
+      )}
+
       {/* Controls Overlay */}
-      {!showNativeFallback && !showFormatError && (
+      {!useDailymotionIframe && !showNativeFallback && !showProviderError && !showFormatError && (
       <Box
         className="video-controls"
         sx={{
@@ -615,7 +748,7 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
       )}
 
       {/* Top Bar Controls */}
-      {showControls && !showNativeFallback && !showFormatError && (
+      {showControls && !useDailymotionIframe && !showNativeFallback && !showProviderError && !showFormatError && (
         <Box
           sx={{
             position: 'absolute',
@@ -705,7 +838,7 @@ const VideoPlayer = ({ url, title, videoId, autoPlay = false }) => {
       )}
 
       {/* Play/Pause Overlay */}
-      {!playing && !showNativeFallback && !showFormatError && (
+      {!playing && !useDailymotionIframe && !showNativeFallback && !showProviderError && !showFormatError && (
         <Box
           sx={{
             position: 'absolute',

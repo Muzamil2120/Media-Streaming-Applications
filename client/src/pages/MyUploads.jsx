@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:5002';
 
 export default function MyUploads() {
@@ -26,6 +27,24 @@ export default function MyUploads() {
   const [videos, setVideos] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
+
+  const handleDelete = async (videoId) => {
+    if (!videoId) return;
+    const ok = window.confirm('Delete this video? This cannot be undone.');
+    if (!ok) return;
+
+    try {
+      setError('');
+      setDeletingId(videoId);
+      await mediaAPI.deleteMedia(videoId);
+      setVideos((prev) => prev.filter((v) => v && v._id !== videoId));
+    } catch (err) {
+      setError(err.message || 'Failed to delete video');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
 
   useEffect(() => {
@@ -111,6 +130,13 @@ export default function MyUploads() {
                   </Button>
                   <IconButton aria-label="edit" onClick={() => navigate(`/media/edit/${video._id}`)}>
                     <EditIcon />
+                  </IconButton>
+                  <IconButton
+                    aria-label="delete"
+                    disabled={deletingId === video._id}
+                    onClick={() => handleDelete(video._id)}
+                  >
+                    <DeleteIcon />
                   </IconButton>
                 </Stack>
               </Card>

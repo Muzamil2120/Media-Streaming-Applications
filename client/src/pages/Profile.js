@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { userAPI } from '../services/api';
+import { mediaAPI, userAPI } from '../services/api';
 import VideoCard from '../components/VideoCard';
 import './Profile.css';
 import { useAuth } from '../context/AuthContext';
@@ -9,12 +9,45 @@ function Profile() {
   const { id: rawId } = useParams();
   const routeId = rawId && rawId !== 'undefined' ? rawId : undefined;
   const navigate = useNavigate();
+  const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:5002';
   const [user, setUser] = useState(null);
   const [uploads, setUploads] = useState([]);
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [submittingSub, setSubmittingSub] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState('');
   const { user: authUser } = useAuth();
+
+  const normalizeImageUrl = (raw) => {
+    if (!raw || typeof raw !== 'string') return '';
+    if (raw.startsWith('data:') || raw.startsWith('blob:')) return raw;
+    if (raw.startsWith('//')) return `https:${raw}`;
+    if (raw.startsWith('http')) return raw;
+    return `${apiBase}${raw}`;
+  };
+
+  const computeSubscribed = useCallback((fetchedUser) => {
+    const subscriberList = fetchedUser?.subscribers || fetchedUser?.subscribedBy || [];
+    const currentId = authUser && (authUser.id || authUser._id);
+    return subscriberList.some((u) => (u?._id || u?.id || u).toString() === (currentId || '').toString());
+  }, [authUser]);
+
+  const loadProfile = useCallback(async (targetId, { loadUploads = true } = {}) => {
+    const res = await userAPI.getUserProfile(targetId);
+    const fetched = res.user || res;
+    setUser(fetched);
+    setSubscribed(computeSubscribed(fetched));
+
+    if (loadUploads) {
+      try {
+        const uploadsRes = await userAPI.getUserUploads(targetId);
+        setUploads(uploadsRes.uploads || uploadsRes.media || uploadsRes || []);
+      } catch {
+        // ignore uploads load errors here; page still usable
+      }
+    }
+  }, [computeSubscribed]);
 
   useEffect(() => {
     let mounted = true;
@@ -34,45 +67,68 @@ function Profile() {
     }
 
     setLoading(true);
-    userAPI.getUserProfile(targetId)
-      .then(res => {
-        if (!mounted) return;
-        const fetched = res.user || res;
-        setUser(fetched);
-        const subscriberList = fetched.subscribers || fetched.subscribedBy || [];
-        const currentId = authUser && (authUser.id || authUser._id);
-        setSubscribed(subscriberList.some((u) => (u._id || u.id || u).toString() === (currentId || '').toString()));
-        setLoading(false);
-      })
-      .catch(err => {
+    (async () => {
+      try {
+        await loadProfile(targetId, { loadUploads: true });
+      } catch (err) {
         if (!mounted) return;
         setError(err.message || 'Failed to load user');
-        setLoading(false);
-      });
-
-    userAPI.getUserUploads(targetId)
-      .then(res => { if (mounted) setUploads(res.uploads || res.media || res || []); })
-      .catch(() => {});
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
 
     return () => { mounted = false; };
-  }, [routeId, authUser, navigate]);
+  }, [routeId, authUser, navigate, loadProfile]);
 
-  const handleSubscribe = () => {
+  const handleSubscribeToggle = async () => {
     const targetId = routeId || (user && (user._id || user.id));
-    userAPI.subscribe(targetId).then(() => setSubscribed(true)).catch(() => {});
+    if (!targetId) return;
+    try {
+      setError('');
+      setSubmittingSub(true);
+
+      if (subscribed) {
+        await userAPI.unsubscribe(targetId);
+      } else {
+        await userAPI.subscribe(targetId);
+      }
+
+      await loadProfile(targetId, { loadUploads: false });
+    } catch (err) {
+      setError(err.message || 'Subscription action failed');
+    } finally {
+      setSubmittingSub(false);
+    }
   };
-  const handleUnsubscribe = () => {
-    const targetId = routeId || (user && (user._id || user.id));
-    userAPI.unsubscribe(targetId).then(() => setSubscribed(false)).catch(() => {});
+
+  const handleDelete = async (mediaId) => {
+    if (!mediaId) return;
+    const ok = window.confirm('Delete this video? This cannot be undone.');
+    if (!ok) return;
+
+    try {
+      setError('');
+      setDeletingId(mediaId);
+      await mediaAPI.deleteMedia(mediaId);
+      setUploads((prev) => prev.filter((v) => v && v._id !== mediaId));
+    } catch (err) {
+      setError(err.message || 'Failed to delete video');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   if (loading) return <div className="profile-loading">Loading...</div>;
   if (error) return <div className="profile-error">{error}</div>;
   if (!user) return <div className="profile-error">User not found</div>;
 
-  const isOwner = authUser && (authUser.id === user._id || authUser.id === user.id || authUser._id === user._id);
+  const authId = authUser && (authUser.id || authUser._id);
+  const profileId = user && (user._id || user.id);
+  const isOwner = authId && profileId && String(authId) === String(profileId);
   const displayName = user.name || user.username || 'User';
   const subscriberCount = (user.subscribers && user.subscribers.length) || user.subscribersCount || 0;
+  const avatarSrc = normalizeImageUrl(user.avatar) || '/placeholder.svg';
 
   return (
     <div className="profile-page">
@@ -81,17 +137,21 @@ function Profile() {
       
       {/* Profile Header */}
       <div className="profile-header">
-        <img className="profile-avatar" src={user.avatar || '/default-avatar.jpg'} alt={displayName} />
+        <img className="profile-avatar" src={avatarSrc} alt={displayName} />
         <div className="profile-info">
           <h2>{displayName} {user.verified && <span className="verified-badge">✓</span>}</h2>
           <div className="profile-meta">
             <span>📊 {subscriberCount} subscribers</span>
             {isOwner ? (
               <a href="/edit-profile" className="edit-profile-btn">Edit Channel</a>
+            ) : !authUser ? (
+              <button className="subscribe-btn" onClick={() => navigate('/signin', { state: { from: `/profile/${user._id || user.id}` } })}>
+                Sign in to Subscribe
+              </button>
             ) : subscribed ? (
-              <button className="unsubscribe-btn" onClick={handleUnsubscribe}>✓ Subscribed</button>
+                <button className="unsubscribe-btn" disabled={submittingSub} onClick={handleSubscribeToggle}>✓ Subscribed</button>
             ) : (
-              <button className="subscribe-btn" onClick={handleSubscribe}>Subscribe</button>
+                <button className="subscribe-btn" disabled={submittingSub} onClick={handleSubscribeToggle}>Subscribe</button>
             )}
           </div>
           <div className="profile-bio">{user.bio || 'Welcome to my channel!'}</div>
@@ -120,7 +180,7 @@ function Profile() {
         ) : (
           <div className="profile-uploads-grid">
             {uploads.map(video => (
-              <VideoCard key={video._id} media={video} />
+              <VideoCard key={video._id} media={video} onDelete={deletingId ? undefined : handleDelete} />
             ))}
           </div>
         )}
