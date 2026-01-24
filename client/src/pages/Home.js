@@ -9,13 +9,48 @@ function Home({ initialNav = 'home' }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [videos, setVideos] = useState([]);
+  const [shorts, setShorts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [shortsLoading, setShortsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [shortsError, setShortsError] = useState('');
   const outletCtx = useOutletContext();
   const sidebarOpen = outletCtx && typeof outletCtx.sidebarOpen !== 'undefined' ? outletCtx.sidebarOpen : true;
 
   // Section refs for scrolling
   const topRef = useRef(null);
+
+  const normalizeDMVideo = (video) => {
+    const bestThumb = video.thumbnail_720_url || video.thumbnail_480_url || video.thumbnail_url;
+    const safeThumb = typeof bestThumb === 'string' && bestThumb.startsWith('//') ? `https:${bestThumb}` : bestThumb;
+    const safeUrl = (() => {
+      const page = video.url;
+      if (typeof page === 'string' && page.trim()) {
+        if (page.startsWith('//')) return `https:${page}`;
+        if (page.startsWith('http://')) return page.replace(/^http:\/\//i, 'https://');
+        return page;
+      }
+      const id = video.id ? String(video.id) : '';
+      return id ? `https://www.dailymotion.com/video/${id}` : '';
+    })();
+
+    return {
+      _id: video.id,
+      title: video.title,
+      description: video.description,
+      thumbnailUrl: safeThumb,
+      views: video.views_total,
+      duration: formatDuration(video.duration),
+      uploader: {
+        _id: 'dailymotion',
+        username: video['channel.name'] || 'Dailymotion',
+        avatar: null,
+      },
+      createdAt: video.created_time ? new Date(video.created_time * 1000).toISOString() : new Date().toISOString(),
+      isDailymotion: true,
+      filePath: safeUrl,
+    };
+  };
 
   const loadVideos = useCallback(async () => {
     setLoading(true);
@@ -26,37 +61,7 @@ function Home({ initialNav = 'home' }) {
         dailymotionAPI.getTrending().catch(() => [])
       ]);
 
-      const normalizedDM = dmData.map((video) => {
-        const bestThumb = video.thumbnail_720_url || video.thumbnail_480_url || video.thumbnail_url;
-        const safeThumb = typeof bestThumb === 'string' && bestThumb.startsWith('//') ? `https:${bestThumb}` : bestThumb;
-        const safeUrl = (() => {
-          const page = video.url;
-          if (typeof page === 'string' && page.trim()) {
-            if (page.startsWith('//')) return `https:${page}`;
-            if (page.startsWith('http://')) return page.replace(/^http:\/\//i, 'https://');
-            return page;
-          }
-          const id = video.id ? String(video.id) : '';
-          return id ? `https://www.dailymotion.com/video/${id}` : '';
-        })();
-
-        return {
-          _id: video.id,
-          title: video.title,
-          description: video.description,
-          thumbnailUrl: safeThumb,
-          views: video.views_total,
-          duration: formatDuration(video.duration),
-          uploader: {
-            _id: 'dailymotion',
-            username: video['channel.name'] || 'Dailymotion',
-            avatar: null,
-          },
-          createdAt: video.created_time ? new Date(video.created_time * 1000).toISOString() : new Date().toISOString(),
-          isDailymotion: true,
-          filePath: safeUrl,
-        };
-      });
+      const normalizedDM = dmData.map((video) => normalizeDMVideo(video));
 
       const localVideos = Array.isArray(localData) ? localData : (localData.media || []);
       const normalizedLocal = localVideos.map(video => {
@@ -103,9 +108,24 @@ function Home({ initialNav = 'home' }) {
     }
   }, [user?._id]);
 
+  const loadShorts = useCallback(async () => {
+    setShortsLoading(true);
+    setShortsError('');
+    try {
+      const dmShorts = await dailymotionAPI.getShortsByTopic('shorts', 1, 12);
+      setShorts(dmShorts.map((video) => normalizeDMVideo(video)));
+    } catch (err) {
+      setShortsError(err.message || 'Failed to load shorts');
+      setShorts([]);
+    } finally {
+      setShortsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadVideos();
-  }, [loadVideos]);
+    loadShorts();
+  }, [loadVideos, loadShorts]);
 
   return (
     <div className={`home-layout ${sidebarOpen ? '' : 'sidebar-collapsed'}`} ref={topRef}>
@@ -159,6 +179,50 @@ function Home({ initialNav = 'home' }) {
                         <span>{video.uploader?.username || video.uploader?.name || 'Unknown User'}</span>
                         <span>{video.views ? `${video.views} views` : 'No views'}</span>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="section">
+          <div className="section-header">
+            <div className="shorts-title">
+              <span className="shorts-pill">Shorts</span>
+              <span className="shorts-subtitle">Quick picks from Dailymotion</span>
+            </div>
+          </div>
+
+          {shortsLoading && <div className="loading">Loading shorts...</div>}
+          {shortsError && <div className="error">{shortsError}</div>}
+          {!shortsLoading && !shortsError && shorts.length === 0 && (
+            <div className="no-videos">No shorts available.</div>
+          )}
+
+          {!shortsLoading && !shortsError && shorts.length > 0 && (
+            <div className="shorts-row">
+              {shorts.map((video) => (
+                <div
+                  key={video._id}
+                  className="shorts-card"
+                  onClick={() => navigate(`/media/play/${video._id}`)}
+                >
+                  <div className="shorts-thumb-wrapper">
+                    <img
+                      src={video.thumbnailUrl || '/placeholder.svg'}
+                      alt={video.title}
+                      className="shorts-thumb"
+                    />
+                    <span className="shorts-duration">{video.duration || '0:00'}</span>
+                    <span className="shorts-badge">Shorts</span>
+                  </div>
+                  <div className="shorts-info">
+                    <h3 className="shorts-title-text" title={video.title}>{video.title}</h3>
+                    <div className="shorts-meta">
+                      <span>{video.uploader?.username || 'Dailymotion'}</span>
+                      <span>{video.views ? `${video.views} views` : 'No views'}</span>
                     </div>
                   </div>
                 </div>
